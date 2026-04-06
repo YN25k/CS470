@@ -35,7 +35,8 @@ def clear_stage_tables(connection) -> None:
     connection.execute("DELETE FROM clean_markets")
 
 
-def main() -> None:
+def run_cleaning(verbose: bool = True) -> int:
+    """Run the full cleaning pipeline. Returns the number of clean markets."""
     with db_cursor() as connection:
         clear_stage_tables(connection)
         raw_rows = connection.execute("SELECT * FROM raw_markets ORDER BY market_id").fetchall()
@@ -115,9 +116,15 @@ def main() -> None:
             )
 
         dropped = sum(drop_counts.values())
-        print(f"Started with {started} raw markets. Dropped {dropped}. Clean dataset: {len(clean_rows)} markets.")
-        for reason in DROP_REASONS:
-            print(f"{reason}: {drop_counts.get(reason, 0)}")
+        if verbose:
+            print(f"Started with {started} raw markets. Dropped {dropped}. Clean dataset: {len(clean_rows)} markets.")
+            for reason in DROP_REASONS:
+                print(f"  {reason}: {drop_counts.get(reason, 0)}")
+        return len(clean_rows)
+
+
+def main() -> None:
+    run_cleaning(verbose=True)
 
 
 if __name__ == "__main__":

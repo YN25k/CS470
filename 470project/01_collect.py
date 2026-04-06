@@ -16,12 +16,21 @@ PAGE_SIZE = 100
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect Polymarket metadata and price history.")
-    parser.add_argument("--limit", type=int, default=500, help="Number of closed markets to fetch.")
+    parser.add_argument("--limit", type=int, default=500, help="Number of closed markets to fetch per batch.")
+    parser.add_argument("--min-clean", type=int, default=500, help="Keep fetching batches until at least this many markets survive cleaning.")
     return parser.parse_args()
 
 
 def request_json(session: requests.Session, url: str, params: dict[str, Any]) -> Any:
-    response = session.get(url, params=params, timeout=30)
+    for attempt in range(5):
+        response = session.get(url, params=params, timeout=30)
+        if response.status_code == 429:
+            wait = 2 ** attempt
+            print(f"  Rate limited, waiting {wait}s...")
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response.json()
     response.raise_for_status()
     return response.json()
 
@@ -47,10 +56,16 @@ def parse_yes_token_id(clob_token_ids: Any) -> str | None:
     return None
 
 
-def fetch_markets(limit: int) -> list[dict[str, Any]]:
+def fetch_markets(limit: int, start_offset: int = 0) -> tuple[list[dict[str, Any]], bool]:
+    """Fetch up to *limit* markets starting at *start_offset*.
+
+    Returns (markets, has_more) where has_more is False when the API
+    returned fewer results than requested (i.e. we've exhausted the data).
+    """
     session = requests.Session()
     fetched: list[dict[str, Any]] = []
-    for offset in range(0, limit, PAGE_SIZE):
+    has_more = True
+    for offset in range(start_offset, start_offset + limit, PAGE_SIZE):
         params = {
             "closed": "true",
             "limit": PAGE_SIZE,
@@ -60,13 +75,16 @@ def fetch_markets(limit: int) -> list[dict[str, Any]]:
         }
         page = request_json(session, GAMMA_URL, params)
         if not isinstance(page, list) or not page:
+            has_more = False
             break
         fetched.extend(page)
-        print(f"Fetched {len(fetched)} markets so far...")
-        if len(page) < PAGE_SIZE or len(fetched) >= limit:
+        print(f"Fetched {len(fetched)} markets so far (offset {start_offset})...")
+        if len(page) < PAGE_SIZE:
+            has_more = False
             break
-        time.sleep(0.3)
-    return fetched[:limit]
+        if len(fetched) >= limit:
+            break
+    return fetched[:limit], has_more
 
 
 def insert_markets(markets: list[dict[str, Any]]) -> int:
@@ -160,18 +178,13 @@ def ensure_price_history_index() -> None:
         )
 
 
-def main() -> None:
-    args = parse_args()
-    ensure_price_history_index()
-    markets = fetch_markets(args.limit)
-    print(f"Fetched {len(markets)} market records from Gamma.")
-    inserted_markets = insert_markets(markets)
-    print(f"Inserted {inserted_markets} new rows into raw_markets.")
-
+def fetch_all_price_histories() -> None:
+    """Fetch CLOB price history for every raw_market that doesn't have it yet."""
     session = requests.Session()
     pending = fetch_missing_histories()
+    if not pending:
+        return
     print(f"Need to fetch price history for {len(pending)} markets.")
-
     total_points = 0
     for index, item in enumerate(pending, start=1):
         payload = request_json(
@@ -183,8 +196,43 @@ def main() -> None:
         inserted = insert_price_history(item["market_id"], history)
         total_points += inserted
         if index % 50 == 0 or index == len(pending):
-            print(f"Processed {index}/{len(pending)} markets; inserted {total_points} history rows.")
-        time.sleep(0.5)
+            print(f"  Processed {index}/{len(pending)} markets; inserted {total_points} history rows.")
+
+
+def main() -> None:
+    import importlib
+    clean_module = importlib.import_module("02_clean")
+    run_cleaning = clean_module.run_cleaning
+
+    args = parse_args()
+    ensure_price_history_index()
+    batch_size = args.limit
+    min_clean = args.min_clean
+    offset = 0
+    batch_number = 0
+
+    while True:
+        batch_number += 1
+        print(f"\n=== Batch {batch_number}: fetching {batch_size} markets (offset {offset}) ===")
+        markets, has_more = fetch_markets(batch_size, start_offset=offset)
+        if not markets:
+            print("No more markets available from the API.")
+            break
+        print(f"Fetched {len(markets)} market records from Gamma.")
+        inserted_markets = insert_markets(markets)
+        print(f"Inserted {inserted_markets} new rows into raw_markets.")
+
+        fetch_all_price_histories()
+
+        clean_count = run_cleaning(verbose=True)
+        print(f"\n--- Clean markets so far: {clean_count} / {min_clean} target ---")
+        if clean_count >= min_clean:
+            print(f"Target reached! {clean_count} clean markets.")
+            break
+        if not has_more:
+            print(f"API exhausted. Only {clean_count} clean markets available.")
+            break
+        offset += batch_size
 
     print("Collection complete.")
 
