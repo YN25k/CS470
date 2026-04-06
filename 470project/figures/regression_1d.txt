@@ -1,0 +1,1 @@
+Regression failed for 1d: Singular matrix

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -10,7 +9,7 @@ from statsmodels.tools.sm_exceptions import PerfectSeparationError
 
 from utils import FIGURES_DIR, db_cursor, ensure_directories
 
-BINS = np.linspace(0.0, 1.0, 11)
+BINS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0001]  # last bin [0.9,1.0001) captures 1.0
 BIN_LABELS = [f"{lower:.1f}-{upper:.1f}" for lower, upper in zip(BINS[:-1], BINS[1:])]
 
 
@@ -53,7 +52,7 @@ def assign_probability_bins(df: pd.DataFrame) -> pd.DataFrame:
         bins=BINS,
         labels=BIN_LABELS,
         include_lowest=True,
-        right=True,
+        right=False,
     )
     return working
 
@@ -127,14 +126,18 @@ def insert_brier_decomposition(df: pd.DataFrame) -> pd.DataFrame:
             for label, bin_df in grouped:
                 if bin_df.empty:
                     continue
-                lower, upper = map(float, str(label).split("-"))
-                forecast_k = (lower + upper) / 2.0
+                forecast_k = float(bin_df["probability_at_snapshot"].mean())
                 empirical_rate_k = float(bin_df["outcome_binary"].mean())
                 n_k = len(bin_df)
                 reliability += n_k * (forecast_k - empirical_rate_k) ** 2
                 resolution += n_k * (empirical_rate_k - base_rate) ** 2
             reliability /= n_markets
             resolution /= n_markets
+            computed_brier = reliability - resolution + uncertainty
+            actual_brier = float(subset["brier_score"].mean())
+            if abs(computed_brier - actual_brier) > 0.01:
+                print(f"  Warning: decomposition mismatch for genre={genre}, {snapshot_name}: "
+                      f"computed={computed_brier:.4f} vs actual={actual_brier:.4f}")
             rows.append(
                 {
                     "event_genre": genre,
