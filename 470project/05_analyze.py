@@ -11,6 +11,7 @@ from utils import FIGURES_DIR, db_cursor, ensure_directories
 
 BINS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0001]  # last bin [0.9,1.0001) captures 1.0
 BIN_LABELS = [f"{lower:.1f}-{upper:.1f}" for lower, upper in zip(BINS[:-1], BINS[1:])]
+HORIZON_ORDER = ["1h", "12h", "1d"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,9 +58,28 @@ def assign_probability_bins(df: pd.DataFrame) -> pd.DataFrame:
     return working
 
 
+def ordered_horizons(df: pd.DataFrame) -> list[str]:
+    present = set(df["snapshot_name"].dropna().unique())
+    ordered = [horizon for horizon in HORIZON_ORDER if horizon in present]
+    extras = sorted(present - set(HORIZON_ORDER))
+    return ordered + extras
+
+
+def report_genre_imbalance(df: pd.DataFrame) -> None:
+    counts = df["event_genre"].value_counts().sort_values(ascending=False)
+    print("\nGenre counts in analysis sample:")
+    for genre, count in counts.items():
+        print(f"  {genre}: {count}")
+    if len(counts) >= 2:
+        smallest = int(counts.min())
+        largest = int(counts.max())
+        if smallest == 0 or largest / max(smallest, 1) >= 2.0:
+            print("WARNING: Genre distribution is imbalanced. Interpret cross-genre comparisons with caution.")
+
+
 def insert_calibration(df: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    for snapshot_name in sorted(df["snapshot_name"].unique()):
+    for snapshot_name in ordered_horizons(df):
         snapshot_df = df[df["snapshot_name"] == snapshot_name]
         groups = [(None, snapshot_df)] + [
             (genre, snapshot_df[snapshot_df["event_genre"] == genre])
@@ -108,7 +128,7 @@ def insert_calibration(df: pd.DataFrame) -> pd.DataFrame:
 
 def insert_brier_decomposition(df: pd.DataFrame) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    for snapshot_name in sorted(df["snapshot_name"].unique()):
+    for snapshot_name in ordered_horizons(df):
         snapshot_df = df[df["snapshot_name"] == snapshot_name]
         groups = [(None, snapshot_df)] + [
             (genre, snapshot_df[snapshot_df["event_genre"] == genre])
@@ -170,7 +190,7 @@ def insert_brier_decomposition(df: pd.DataFrame) -> pd.DataFrame:
 
 def run_regressions(df: pd.DataFrame) -> None:
     ensure_directories()
-    for snapshot_name in sorted(df["snapshot_name"].unique()):
+    for snapshot_name in ordered_horizons(df):
         subset = df[df["snapshot_name"] == snapshot_name].copy()
         if subset.empty:
             continue
@@ -180,28 +200,50 @@ def run_regressions(df: pd.DataFrame) -> None:
             (FIGURES_DIR / f"regression_{snapshot_name}.txt").write_text(message)
             continue
         genre_reference = subset["event_genre"].value_counts().idxmax()
+        subset["volume_total"] = pd.to_numeric(subset["volume_total"], errors="coerce")
+        subset["liquidity_raw"] = pd.to_numeric(subset["liquidity_raw"], errors="coerce")
         subset["log_volume"] = np.log(subset["volume_total"].clip(lower=1.0))
         subset["log_liquidity"] = np.log(subset["liquidity_raw"].fillna(1.0).clip(lower=1.0))
         dummies = pd.get_dummies(subset["event_genre"], prefix="genre", drop_first=False, dtype=float)
         reference_col = f"genre_{genre_reference}"
         if reference_col in dummies.columns:
             dummies = dummies.drop(columns=[reference_col])
+
+        full_subset = subset.copy()
         for column in dummies.columns:
-            subset[f"{column}_x_probability"] = dummies[column] * subset["probability_at_snapshot"]
-        design = pd.concat(
+            full_subset[f"{column}_x_probability"] = dummies[column] * full_subset["probability_at_snapshot"]
+        full_design = pd.concat(
             [
-                subset[["probability_at_snapshot", "log_volume", "log_liquidity"]],
+                full_subset[["probability_at_snapshot", "log_volume", "log_liquidity"]],
                 dummies,
-                subset[[column for column in subset.columns if column.endswith("_x_probability")]],
+                full_subset[[column for column in full_subset.columns if column.endswith("_x_probability")]],
             ],
             axis=1,
         )
-        design = sm.add_constant(design, has_constant="add")
-        try:
-            result = sm.Logit(subset["outcome_binary"], design).fit(disp=False, maxiter=200)
-            summary_text = result.summary2().as_text()
-        except (PerfectSeparationError, np.linalg.LinAlgError, ValueError) as exc:
-            summary_text = f"Regression failed for {snapshot_name}: {exc}"
+        simple_genre_design = pd.concat(
+            [
+                subset[["probability_at_snapshot"]],
+                dummies,
+            ],
+            axis=1,
+        )
+        probability_only_design = subset[["probability_at_snapshot"]].copy()
+
+        model_specs = [
+            ("full model with interactions", full_design),
+            ("fallback model without interactions", simple_genre_design),
+            ("fallback probability-only model", probability_only_design),
+        ]
+
+        summary_text = ""
+        for model_label, design in model_specs:
+            design = sm.add_constant(design, has_constant="add")
+            try:
+                result = sm.Logit(subset["outcome_binary"], design).fit(disp=False, maxiter=200)
+                summary_text = f"Model used: {model_label}\nReference genre: {genre_reference}\n\n{result.summary2().as_text()}"
+                break
+            except (PerfectSeparationError, np.linalg.LinAlgError, ValueError) as exc:
+                summary_text = f"{model_label} failed for {snapshot_name}: {exc}"
         output_path = FIGURES_DIR / f"regression_{snapshot_name}.txt"
         output_path.write_text(summary_text)
         print(f"\nLogistic regression for {snapshot_name} (reference genre: {genre_reference})")
@@ -216,6 +258,7 @@ def main() -> None:
         raise SystemExit("No snapshot data available. Run the earlier stages first.")
     df = assign_probability_bins(df)
     df["event_genre"] = df["event_genre"].fillna("other")
+    report_genre_imbalance(df)
     insert_calibration(df)
     insert_brier_decomposition(df)
     run_regressions(df)

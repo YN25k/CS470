@@ -22,15 +22,16 @@ def log_drop(connection, market_id: str, drop_reason: str, detail: str | None = 
     )
 
 
-def is_binary_yes_no(outcomes_value: str | None) -> bool:
+def has_exactly_two_outcomes(outcomes_value: str | None) -> bool:
     outcomes = parse_json_field(outcomes_value, default=[])
-    if not isinstance(outcomes, list) or len(outcomes) != 2:
-        return False
-    normalized = sorted(str(item).strip().lower() for item in outcomes)
-    return normalized == ["no", "yes"]
+    return isinstance(outcomes, list) and len(outcomes) == 2
 
 
 def clear_stage_tables(connection) -> None:
+    connection.execute("DELETE FROM labels")
+    connection.execute("DELETE FROM market_snapshots")
+    connection.execute("DELETE FROM calibration")
+    connection.execute("DELETE FROM brier_decomposition")
     connection.execute("DELETE FROM cleaning_log")
     connection.execute("DELETE FROM clean_markets")
 
@@ -47,7 +48,7 @@ def run_cleaning(verbose: bool = True) -> int:
 
         for row in raw_rows:
             market_id = row["market_id"]
-            if not is_binary_yes_no(row["outcomes"]):
+            if not has_exactly_two_outcomes(row["outcomes"]):
                 log_drop(connection, market_id, "not_binary", row["outcomes"])
                 drop_counts["not_binary"] += 1
                 continue
@@ -66,7 +67,7 @@ def run_cleaning(verbose: bool = True) -> int:
                 log_drop(connection, market_id, "ambiguous_resolution", detail)
                 drop_counts["ambiguous_resolution"] += 1
                 continue
-            if row["volume_total"] is None or float(row["volume_total"]) < 1000:
+            if row["volume_total"] is None or float(row["volume_total"]) < 100:
                 detail = None if row["volume_total"] is None else str(row["volume_total"])
                 log_drop(connection, market_id, "low_volume", detail)
                 drop_counts["low_volume"] += 1

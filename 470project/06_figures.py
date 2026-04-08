@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt
 from utils import FIGURES_DIR, db_cursor, ensure_directories
 
 GENRE_ORDER = ["politics", "sports", "economics", "culture"]
-HORIZON_ORDER = ["14d", "7d", "1d"]
-COLORS = {"14d": "#1b9e77", "7d": "#d95f02", "1d": "#7570b3"}
+HORIZON_ORDER = ["1h", "12h", "1d"]
+COLORS = {"1h": "#1b9e77", "12h": "#d95f02", "1d": "#7570b3"}
 
 
 def load_table(query: str) -> pd.DataFrame:

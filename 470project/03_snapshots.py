@@ -5,8 +5,8 @@ from collections import Counter
 from utils import compute_log_loss, db_cursor, hours_between, shift_timestamp
 
 HORIZONS = {
-    "14d": 336,
-    "7d": 168,
+    "1h": 1,
+    "12h": 12,
     "1d": 24,
 }
 

@@ -1,1 +1,21 @@
-Regression failed for 1d: Singular matrix
+Model used: fallback model without interactions
+Reference genre: politics
+
+                            Results: Logit
+=======================================================================
+Model:                Logit              Method:             MLE       
+Dependent Variable:   outcome_binary     Pseudo R-squared:   0.221     
+Date:                 2026-04-08 11:22   AIC:                77.7514   
+No. Observations:     67                 BIC:                86.5702   
+Df Model:             3                  Log-Likelihood:     -34.876   
+Df Residuals:         63                 LL-Null:            -44.747   
+Converged:            1.0000             LLR p-value:        0.00019184
+No. Iterations:       7.0000             Scale:              1.0000    
+-----------------------------------------------------------------------
+                         Coef.  Std.Err.    z    P>|z|   [0.025  0.975]
+-----------------------------------------------------------------------
+const                   -3.1315   0.9269 -3.3785 0.0007 -4.9482 -1.3149
+probability_at_snapshot  5.9722   1.9506  3.0618 0.0022  2.1491  9.7953
+genre_economics          0.0340   0.6191  0.0549 0.9562 -1.1794  1.2474
+genre_sports             1.2609   1.6846  0.7485 0.4542 -2.0408  4.5626
+=======================================================================

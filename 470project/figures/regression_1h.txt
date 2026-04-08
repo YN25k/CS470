@@ -1,0 +1,19 @@
+Model used: fallback probability-only model
+Reference genre: economics
+
+                            Results: Logit
+=======================================================================
+Model:                Logit              Method:             MLE       
+Dependent Variable:   outcome_binary     Pseudo R-squared:   0.129     
+Date:                 2026-04-08 11:22   AIC:                292.2106  
+No. Observations:     241                BIC:                299.1802  
+Df Model:             1                  Log-Likelihood:     -144.11   
+Df Residuals:         239                LL-Null:            -165.53   
+Converged:            1.0000             LLR p-value:        5.8949e-11
+No. Iterations:       7.0000             Scale:              1.0000    
+-----------------------------------------------------------------------
+                         Coef.  Std.Err.    z    P>|z|   [0.025  0.975]
+-----------------------------------------------------------------------
+const                   -3.5177   0.8412 -4.1817 0.0000 -5.1664 -1.8690
+probability_at_snapshot  6.7635   1.6715  4.0464 0.0001  3.4875 10.0395
+=======================================================================
