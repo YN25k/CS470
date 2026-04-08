@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 from utils import FIGURES_DIR, db_cursor, ensure_directories
 
-GENRE_ORDER = ["politics", "sports", "economics", "culture"]
+GENRE_ORDER = ["politics", "sports", "economics", "other"]
 HORIZON_ORDER = ["1h", "12h", "1d"]
 COLORS = {"1h": "#1b9e77", "12h": "#d95f02", "1d": "#7570b3"}
 

@@ -13,6 +13,61 @@ from typing import Any
 DB_PATH = Path(__file__).resolve().parent / "data" / "prediction_markets.db"
 FIGURES_DIR = Path(__file__).resolve().parent / "figures"
 
+CATEGORY_MAP = {
+    "politics": "politics",
+    "elections": "politics",
+    "government": "politics",
+    "us-current-affairs": "politics",
+    "world": "politics",
+    "middle-east": "politics",
+    "ukraine & russia": "politics",
+    "sports": "sports",
+    "nba playoffs": "sports",
+    "nfl": "sports",
+    "nba": "sports",
+    "mlb": "sports",
+    "soccer": "sports",
+    "crypto": "economics",
+    "business": "economics",
+    "economics": "economics",
+    "finance": "economics",
+    "art": "other",
+    "culture": "other",
+    "entertainment": "other",
+    "media": "other",
+    "music": "other",
+    "movies": "other",
+}
+
+KEYWORDS = {
+    "politics": [
+        "election", "president", "presidential", "congress", "senator", "governor", "parliament",
+        "prime minister", "vote", "voter", "ballot", "political", "democrat", "republican", "gop",
+        "trump", "biden", "legislation", "bill signing", "executive order", "impeach", "cabinet",
+        "un", "nato", "sanction", "diplomatic", "geopolitical", "war", "invasion", "ceasefire", "treaty",
+    ],
+    "economics": [
+        "gdp", "inflation", "cpi", "interest rate", "fed", "federal reserve", "fomc", "recession",
+        "unemployment", "jobs report", "stock", "s&p", "nasdaq", "dow", "market cap", "ipo",
+        "earnings", "revenue", "trade deficit", "tariff", "debt ceiling", "treasury", "bond", "yield",
+        "crypto", "bitcoin", "ethereum", "oil price", "commodity",
+    ],
+    "sports": [
+        "nfl", "nba", "mlb", "nhl", "ncaa", "super bowl", "world series", "championship", "playoff",
+        "finals", "mvp", "season", "game", "match", "soccer", "football", "basketball", "baseball",
+        "hockey", "tennis", "golf", "ufc", "boxing", "olympic", "world cup", "premier league", "team",
+        "coach", "player", "draft", "trade deadline", "win the", "defeat", "score",
+    ],
+    "other": [
+        "oscar", "emmy", "grammy", "tony", "golden globe", "box office", "movie", "film", "tv show",
+        "streaming", "album", "song", "chart", "billboard", "book", "bestseller", "nobel prize",
+        "pulitzer", "social media", "tiktok", "youtube", "viral", "celebrity", "award", "entertainment",
+        "concert", "tour", "festival", "game of the year",
+    ],
+}
+
+PRIORITY = ["politics", "economics", "sports", "other"]
+
 
 def ensure_directories() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -114,6 +169,26 @@ def normalize_question(text: str) -> str:
     lowered = re.sub(r"[^\w\s]", " ", lowered)
     lowered = re.sub(r"\s+", " ", lowered)
     return lowered.strip()
+
+
+def assign_genre_from_text(text: str) -> str:
+    lowered = (text or "").lower()
+    for genre in PRIORITY:
+        if any(keyword.lower() in lowered for keyword in KEYWORDS[genre]):
+            return genre
+    return "other"
+
+
+def assign_genre_from_category(category: str | None) -> str | None:
+    normalized = (category or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized in CATEGORY_MAP:
+        return CATEGORY_MAP[normalized]
+    for key, genre in CATEGORY_MAP.items():
+        if key in normalized:
+            return genre
+    return None
 
 
 def list_table_columns(connection: sqlite3.Connection, table_name: str) -> list[str]:

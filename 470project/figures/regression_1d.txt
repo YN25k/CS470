@@ -5,7 +5,7 @@ Reference genre: politics
 =======================================================================
 Model:                Logit              Method:             MLE       
 Dependent Variable:   outcome_binary     Pseudo R-squared:   0.221     
-Date:                 2026-04-08 11:22   AIC:                77.7514   
+Date:                 2026-04-08 13:16   AIC:                77.7514   
 No. Observations:     67                 BIC:                86.5702   
 Df Model:             3                  Log-Likelihood:     -34.876   
 Df Residuals:         63                 LL-Null:            -44.747   

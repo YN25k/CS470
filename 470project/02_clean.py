@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from utils import db_cursor, normalize_question, parse_json_field, safe_float
+from utils import assign_genre_from_category, assign_genre_from_text, db_cursor, normalize_question, parse_json_field, safe_float
 
 
 DROP_REASONS = [
@@ -34,6 +34,14 @@ def clear_stage_tables(connection) -> None:
     connection.execute("DELETE FROM brier_decomposition")
     connection.execute("DELETE FROM cleaning_log")
     connection.execute("DELETE FROM clean_markets")
+
+
+def infer_row_genre(row: dict) -> str:
+    category_genre = assign_genre_from_category(row.get("category"))
+    if category_genre is not None:
+        return category_genre
+    combined_text = f"{row.get('question') or ''} {row.get('description') or ''}".strip()
+    return assign_genre_from_text(combined_text)
 
 
 def run_cleaning(verbose: bool = True) -> int:
@@ -91,8 +99,13 @@ def run_cleaning(verbose: bool = True) -> int:
                 drop_counts["duplicate_market"] += 1
 
         clean_rows = list(kept_by_question.values())
+        raw_genre_counts: Counter[str] = Counter()
+        clean_genre_counts: Counter[str] = Counter()
+        for row in raw_rows:
+            raw_genre_counts[infer_row_genre(dict(row))] += 1
         for row in clean_rows:
             resolve_ts = row["resolve_ts"] or row["end_ts"]
+            clean_genre_counts[infer_row_genre(row)] += 1
             connection.execute(
                 """
                 INSERT INTO clean_markets (
@@ -121,6 +134,12 @@ def run_cleaning(verbose: bool = True) -> int:
             print(f"Started with {started} raw markets. Dropped {dropped}. Clean dataset: {len(clean_rows)} markets.")
             for reason in DROP_REASONS:
                 print(f"  {reason}: {drop_counts.get(reason, 0)}")
+            print("\nGenre counts before cleaning:")
+            for genre in ["politics", "sports", "economics", "other"]:
+                print(f"  {genre}: {raw_genre_counts.get(genre, 0)}")
+            print("\nGenre counts after cleaning:")
+            for genre in ["politics", "sports", "economics", "other"]:
+                print(f"  {genre}: {clean_genre_counts.get(genre, 0)}")
         return len(clean_rows)
 
 
