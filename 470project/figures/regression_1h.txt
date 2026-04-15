@@ -1,19 +1,22 @@
-Model used: fallback probability-only model
-Reference genre: economics
+Model used: fallback model without interactions
+Reference genre: other
 
                             Results: Logit
 =======================================================================
 Model:                Logit              Method:             MLE       
-Dependent Variable:   outcome_binary     Pseudo R-squared:   0.129     
-Date:                 2026-04-08 13:16   AIC:                292.2106  
-No. Observations:     241                BIC:                299.1802  
-Df Model:             1                  Log-Likelihood:     -144.11   
-Df Residuals:         239                LL-Null:            -165.53   
-Converged:            1.0000             LLR p-value:        5.8949e-11
+Dependent Variable:   outcome_binary     Pseudo R-squared:   0.134     
+Date:                 2026-04-15 19:34   AIC:                296.7415  
+No. Observations:     241                BIC:                314.1655  
+Df Model:             4                  Log-Likelihood:     -143.37   
+Df Residuals:         236                LL-Null:            -165.53   
+Converged:            1.0000             LLR p-value:        5.4942e-09
 No. Iterations:       7.0000             Scale:              1.0000    
 -----------------------------------------------------------------------
                          Coef.  Std.Err.    z    P>|z|   [0.025  0.975]
 -----------------------------------------------------------------------
-const                   -3.5177   0.8412 -4.1817 0.0000 -5.1664 -1.8690
-probability_at_snapshot  6.7635   1.6715  4.0464 0.0001  3.4875 10.0395
+const                   -3.6740   0.8728 -4.2093 0.0000 -5.3848 -1.9633
+probability_at_snapshot  6.8624   1.7250  3.9783 0.0001  3.4815 10.2432
+genre_economics          0.2880   0.3212  0.8966 0.3700 -0.3416  0.9176
+genre_politics           1.0390   1.4901  0.6973 0.4856 -1.8815  3.9596
+genre_sports             0.4055   0.6506  0.6233 0.5331 -0.8697  1.6807
 =======================================================================

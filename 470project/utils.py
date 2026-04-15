@@ -50,7 +50,8 @@ KEYWORDS = {
         "gdp", "inflation", "cpi", "interest rate", "fed", "federal reserve", "fomc", "recession",
         "unemployment", "jobs report", "stock", "s&p", "nasdaq", "dow", "market cap", "ipo",
         "earnings", "revenue", "trade deficit", "tariff", "debt ceiling", "treasury", "bond", "yield",
-        "crypto", "bitcoin", "ethereum", "oil price", "commodity",
+        "crypto", "bitcoin", "ethereum", "solana", "xrp", "bnb", "usdc", "dogecoin",
+        "oil price", "commodity",
     ],
     "sports": [
         "nfl", "nba", "mlb", "nhl", "ncaa", "super bowl", "world series", "championship", "playoff",
@@ -63,6 +64,7 @@ KEYWORDS = {
         "streaming", "album", "song", "chart", "billboard", "book", "bestseller", "nobel prize",
         "pulitzer", "social media", "tiktok", "youtube", "viral", "celebrity", "award", "entertainment",
         "concert", "tour", "festival", "game of the year",
+        "temperature", "weather", "rainfall", "humidity", "forecast", "celsius", "fahrenheit",
     ],
 }
 
@@ -173,8 +175,17 @@ def normalize_question(text: str) -> str:
 
 def assign_genre_from_text(text: str) -> str:
     lowered = (text or "").lower()
+    scores: dict[str, int] = {genre: 0 for genre in PRIORITY}
+    for genre, keywords in KEYWORDS.items():
+        for keyword in keywords:
+            if keyword.lower() in lowered:
+                scores[genre] += 1
+    max_score = max(scores.values())
+    if max_score == 0:
+        return "other"
+    # Tiebreak using PRIORITY order
     for genre in PRIORITY:
-        if any(keyword.lower() in lowered for keyword in KEYWORDS[genre]):
+        if scores[genre] == max_score:
             return genre
     return "other"
 
