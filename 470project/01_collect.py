@@ -4,6 +4,7 @@ import argparse
 import json
 import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import requests
@@ -105,8 +106,8 @@ class RequestManager:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect Polymarket metadata and price history.")
-    parser.add_argument("--per-genre", type=int, default=1500, help="Target number of markets to fetch per genre group.")
-    parser.add_argument("--min-per-genre", type=int, default=50, help="Warn if any genre falls below this count after collection.")
+    parser.add_argument("--limit", type=int, default=10000, help="Total number of markets to fetch from Gamma API.")
+    parser.add_argument("--workers", type=int, default=15, help="Number of parallel threads for CLOB price history.")
     return parser.parse_args()
 
 
@@ -188,10 +189,11 @@ def insert_markets(markets: list[dict[str, Any]]) -> int:
     return inserted
 
 
-def fetch_tagged_markets(requests_mgr: RequestManager, tag: str, per_genre: int) -> list[dict[str, Any]]:
+def fetch_all_markets(requests_mgr: RequestManager, limit: int) -> list[dict[str, Any]]:
+    """Fetch up to `limit` closed markets from the Gamma API, ordered by volume."""
     fetched: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
-    for offset in range(0, per_genre, PAGE_SIZE):
+    for offset in range(0, limit, PAGE_SIZE):
         payload = requests_mgr.request_json(
             GAMMA_URL,
             {
@@ -200,9 +202,8 @@ def fetch_tagged_markets(requests_mgr: RequestManager, tag: str, per_genre: int)
                 "offset": offset,
                 "order": "volume",
                 "ascending": "false",
-                "tag": tag,
             },
-            f"Gamma markets tag={tag} offset={offset}",
+            f"Gamma markets offset={offset}",
         )
         if payload is None:
             break
@@ -213,71 +214,34 @@ def fetch_tagged_markets(requests_mgr: RequestManager, tag: str, per_genre: int)
             if market_id not in seen_ids:
                 fetched.append(market)
                 seen_ids.add(market_id)
-        if len(payload) < PAGE_SIZE or len(fetched) >= per_genre:
-            break
-    return fetched[:per_genre]
-
-
-def collect_balanced_markets(requests_mgr: RequestManager, per_genre: int) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    combined: dict[str, dict[str, Any]] = {}
-    per_genre_counts: Counter[str] = Counter()
-
-    for genre, tags in GENRE_TAGS.items():
-        genre_market_ids: set[str] = set()
-        print(f"\nCollecting {genre} markets...")
-        for tag in tags:
-            if len(genre_market_ids) >= per_genre:
-                break
-            tagged = fetch_tagged_markets(requests_mgr, tag, per_genre)
-            if not tagged:
-                continue
-            for market in tagged:
-                market_id = str(market.get("id"))
-                combined[market_id] = market
-                if market_id not in genre_market_ids:
-                    genre_market_ids.add(market_id)
-                if len(genre_market_ids) >= per_genre:
-                    break
-            print(f"  tag={tag}: genre pool now {len(genre_market_ids)}")
-        if len(genre_market_ids) == 0:
-            print(f"  No useful tagged results for {genre}; relying on category fallback.")
-        per_genre_counts[genre] = len(genre_market_ids)
-
-    general_limit = per_genre * len(GENRE_TAGS)
-    print(f"\nRunning general pull for up to {general_limit} markets to catch untagged markets...")
-    for offset in range(0, general_limit, PAGE_SIZE):
-        payload = requests_mgr.request_json(
-            GAMMA_URL,
-            {
-                "closed": "true",
-                "limit": PAGE_SIZE,
-                "offset": offset,
-                "order": "volume",
-                "ascending": "false",
-            },
-            f"Gamma markets general offset={offset}",
-        )
-        if payload is None:
-            break
-        if not isinstance(payload, list) or not payload:
-            break
-        for market in payload:
-            market_id = str(market.get("id"))
-            combined.setdefault(market_id, market)
+        if len(fetched) % 1000 == 0 or len(payload) < PAGE_SIZE:
+            print(f"  Fetched {len(fetched)} markets so far...", flush=True)
         if len(payload) < PAGE_SIZE:
             break
+    return fetched
 
-    inferred_counts: Counter[str] = Counter()
-    for market in combined.values():
-        inferred_genre = infer_genre_from_category(market.get("category"))
-        if inferred_genre is not None:
-            inferred_counts[inferred_genre] += 1
 
-    print("\nRaw collection counts by inferred category:")
-    for genre in GENRE_TAGS:
-        print(f"  {genre}: {inferred_counts.get(genre, 0)}")
-
-    return list(combined.values()), dict(inferred_counts)
+def _fetch_one_history(item: dict[str, str]) -> tuple[str, list[dict[str, Any]]]:
+    """Fetch price history for a single market. Runs in a thread."""
+    session = requests.Session()
+    for attempt in range(3):
+        try:
+            response = session.get(
+                CLOB_URL,
+                params={"market": item["yes_token_id"], "interval": "max", "fidelity": 10},
+                timeout=30,
+            )
+            if response.status_code == 429:
+                time.sleep(5 * (attempt + 1))
+                continue
+            if response.status_code != 200:
+                return item["market_id"], []
+            payload = response.json()
+            history = payload.get("history", []) if isinstance(payload, dict) else []
+            return item["market_id"], history
+        except (requests.RequestException, ValueError):
+            time.sleep(2)
+    return item["market_id"], []
 
 
 def fetch_missing_histories() -> list[dict[str, Any]]:
@@ -328,38 +292,43 @@ def ensure_price_history_index() -> None:
         )
 
 
-def fetch_all_price_histories(requests_mgr: RequestManager) -> None:
+def fetch_all_price_histories_parallel(max_workers: int = 15) -> None:
+    """Fetch price histories for all markets missing them, using parallel threads."""
     pending = fetch_missing_histories()
     if not pending:
         print("No missing price histories.")
         return
-    print(f"Need to fetch price history for {len(pending)} markets.")
+    print(f"Fetching price history for {len(pending)} markets using {max_workers} threads...", flush=True)
     total_points = 0
-    skipped_markets: list[str] = []
-    for index, item in enumerate(pending, start=1):
-        payload = requests_mgr.request_json(
-            CLOB_URL,
-            {"market": item["yes_token_id"], "interval": "max", "fidelity": 10},
-            f"CLOB price history market_id={item['market_id']}",
-        )
-        if payload is None:
-            skipped_markets.append(item["market_id"])
-            continue
-        history = payload.get("history", []) if isinstance(payload, dict) else []
-        inserted = insert_price_history(item["market_id"], history)
-        total_points += inserted
-        if index % 50 == 0 or index == len(pending):
-            print(f"Processed {index}/{len(pending)} markets; inserted {total_points} history rows.")
-    if skipped_markets:
-        print(f"Skipped {len(skipped_markets)} markets after repeated server/unexpected errors.")
-        print("Skipped market_ids:", ", ".join(skipped_markets[:20]))
-
-
-def warn_on_genre_counts(counts: dict[str, int], min_per_genre: int) -> None:
-    for genre in GENRE_TAGS:
-        count = counts.get(genre, 0)
-        if count < min_per_genre:
-            print(f"WARNING: {genre} has only {count} collected markets, below the target minimum of {min_per_genre}.")
+    completed = 0
+    batch_size = max_workers * 4
+    for batch_start in range(0, len(pending), batch_size):
+        batch = pending[batch_start:batch_start + batch_size]
+        results: list[tuple[str, list[dict[str, Any]]]] = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(_fetch_one_history, item): item for item in batch}
+            for future in as_completed(futures):
+                results.append(future.result())
+        # Write all results to DB in main thread (avoids SQLite locking)
+        with db_cursor() as connection:
+            for market_id, history in results:
+                completed += 1
+                for point in history:
+                    if "t" not in point or "p" not in point:
+                        continue
+                    probability = safe_float(point["p"])
+                    if probability is None:
+                        continue
+                    cursor = connection.execute(
+                        """
+                        INSERT OR IGNORE INTO raw_price_history (market_id, prob_ts, probability)
+                        VALUES (?, ?, ?)
+                        """,
+                        (market_id, unix_to_iso8601(point["t"]), probability),
+                    )
+                    total_points += cursor.rowcount
+        if completed % 500 <= batch_size or completed == len(pending):
+            print(f"  Processed {completed}/{len(pending)} markets; inserted {total_points} history rows.", flush=True)
 
 
 def main() -> None:
@@ -368,18 +337,33 @@ def main() -> None:
     requests_mgr = RequestManager()
 
     try:
-        markets, inferred_counts = collect_balanced_markets(requests_mgr, args.per_genre)
-        print(f"\nCollected {len(markets)} unique markets before database insert.")
-        inserted_markets = insert_markets(markets)
-        print(f"Inserted {inserted_markets} new rows into raw_markets.")
-        warn_on_genre_counts(inferred_counts, args.min_per_genre)
-        fetch_all_price_histories(requests_mgr)
+        # Step 1: Fetch market metadata from Gamma API
+        print(f"=== Step 1: Fetching up to {args.limit} closed markets from Gamma API ===", flush=True)
+        markets = fetch_all_markets(requests_mgr, args.limit)
+        print(f"Fetched {len(markets)} unique markets.", flush=True)
+        inserted = insert_markets(markets)
+        print(f"Inserted {inserted} new rows into raw_markets.", flush=True)
+
+        # Step 2: Fetch price histories from CLOB API (parallel)
+        print(f"\n=== Step 2: Fetching price histories ({args.workers} threads) ===", flush=True)
+        fetch_all_price_histories_parallel(max_workers=args.workers)
+
     except HardStopError as exc:
         print(str(exc))
         raise SystemExit(1) from exc
 
-    print("Collection complete.")
+    # Summary
+    with db_cursor() as connection:
+        raw_count = connection.execute("SELECT COUNT(*) FROM raw_markets").fetchone()[0]
+        history_count = connection.execute("SELECT COUNT(DISTINCT market_id) FROM raw_price_history").fetchone()[0]
+    print(f"\n=== Collection complete ===", flush=True)
+    print(f"Raw markets: {raw_count}", flush=True)
+    print(f"Markets with price history: {history_count}", flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except HardStopError as exc:
+        print(str(exc))
+        raise SystemExit(1) from exc
