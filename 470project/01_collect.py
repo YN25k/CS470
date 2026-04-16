@@ -209,9 +209,10 @@ def fetch_all_markets(requests_mgr: RequestManager, limit: int) -> list[dict[str
                     continue
                 fetched.append(market)
                 seen_ids.add(market_id)
-        if len(fetched) % 1000 == 0 and len(fetched) > 0 or len(payload) < PAGE_SIZE:
+        if len(fetched) % 100 == 0 and len(fetched) > 0:
             print(f"  Fetched {len(fetched)} markets so far...", flush=True)
         if len(payload) < PAGE_SIZE:
+            print(f"  Gamma API exhausted at {len(fetched)} markets.", flush=True)
             break
     return fetched
 
@@ -322,16 +323,18 @@ def fetch_all_price_histories_parallel(max_workers: int = 15) -> None:
                         (market_id, unix_to_iso8601(point["t"]), probability),
                     )
                     total_points += cursor.rowcount
-        if completed % 500 <= batch_size or completed == len(pending):
+        if completed % 100 <= batch_size or completed == len(pending):
             print(f"  Processed {completed}/{len(pending)} markets; inserted {total_points} history rows.", flush=True)
 
 
 def purge_insufficient_history() -> int:
-    """Delete markets from raw_markets whose price history doesn't span MIN_HISTORY_HOURS before resolve_ts."""
+    """Delete markets from raw_markets whose price history doesn't span MIN_HISTORY_HOURS before anchor_ts."""
     with db_cursor() as connection:
         rows = connection.execute(
             """
-            SELECT rm.market_id, rm.resolve_ts, MIN(rph.prob_ts) as earliest
+            SELECT rm.market_id,
+                   COALESCE(rm.resolve_ts, rm.end_ts) as anchor_ts,
+                   MIN(rph.prob_ts) as earliest
             FROM raw_markets rm
             LEFT JOIN raw_price_history rph ON rph.market_id = rm.market_id
             GROUP BY rm.market_id
@@ -341,12 +344,12 @@ def purge_insufficient_history() -> int:
     purged = 0
     for row in rows:
         market_id = row["market_id"]
-        resolve_ts = row["resolve_ts"]
+        anchor_ts = row["anchor_ts"]
         earliest = row["earliest"]
         keep = False
-        if earliest and resolve_ts:
+        if earliest and anchor_ts:
             try:
-                keep = hours_between(resolve_ts, earliest) >= MIN_HISTORY_HOURS
+                keep = hours_between(anchor_ts, earliest) >= MIN_HISTORY_HOURS
             except Exception:
                 pass
         if not keep:
@@ -373,11 +376,6 @@ def main() -> None:
         # Step 2: Fetch price histories from CLOB API (parallel)
         print(f"\n=== Step 2: Fetching price histories ({args.workers} threads) ===", flush=True)
         fetch_all_price_histories_parallel(max_workers=args.workers)
-
-        # Step 3: Purge markets with insufficient price history for snapshots
-        print(f"\n=== Step 3: Purging markets with < {MIN_HISTORY_HOURS}h of price history ===", flush=True)
-        purged = purge_insufficient_history()
-        print(f"Purged {purged} markets with insufficient history.", flush=True)
 
     except HardStopError as exc:
         print(str(exc))
