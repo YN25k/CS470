@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 
 from utils import assign_genre_from_category, assign_genre_from_text, db_cursor
 
-MAX_PER_GENRE = 700
+MAX_PER_GENRE = 500
 RANDOM_SEED = 42
 
 

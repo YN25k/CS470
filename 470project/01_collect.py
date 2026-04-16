@@ -3,31 +3,19 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import requests
 
-from utils import db_cursor, normalize_timestamp, parse_json_field, safe_float, unix_to_iso8601
+from utils import db_cursor, hours_between, normalize_timestamp, parse_json_field, safe_float, unix_to_iso8601
 
 GAMMA_URL = "https://gamma-api.polymarket.com/markets"
 CLOB_URL = "https://clob.polymarket.com/prices-history"
 PAGE_SIZE = 100
-
-GENRE_TAGS = {
-    "politics": ["politics", "elections", "government"],
-    "sports": ["sports", "nfl", "nba", "mlb", "soccer"],
-    "economics": ["economics", "crypto", "finance", "business"],
-    "culture": ["entertainment", "culture", "media", "music", "movies"],
-}
-
-CATEGORY_HINTS = {
-    "politics": ["politic", "elect", "government", "congress", "senate", "policy", "world"],
-    "sports": ["sport", "nfl", "nba", "mlb", "soccer", "football", "basketball", "baseball", "tennis", "golf"],
-    "economics": ["econom", "crypto", "finance", "business", "market", "stocks"],
-    "culture": ["entertainment", "culture", "media", "music", "movie", "film", "celebrity"],
-}
+MIN_MARKET_DAYS = 2    # skip markets that ran for less than this many days (need 1d snapshot)
+MIN_VOLUME = 500       # skip markets with less than this total volume (USD)
+MIN_HISTORY_HOURS = 25 # require price data at least this many hours before resolve_ts
 
 
 class HardStopError(RuntimeError):
@@ -104,6 +92,18 @@ class RequestManager:
                 return None
 
 
+def market_duration_days(market: dict[str, Any]) -> float:
+    """Return the market duration in days using startDate and endDate from the API."""
+    start = normalize_timestamp(market.get("startDateIso") or market.get("startDate"))
+    end = normalize_timestamp(market.get("endDateIso") or market.get("endDate"))
+    if not start or not end:
+        return 0.0
+    try:
+        return hours_between(end, start) / 24.0
+    except Exception:
+        return 0.0
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect Polymarket metadata and price history.")
     parser.add_argument("--limit", type=int, default=10000, help="Total number of markets to fetch from Gamma API.")
@@ -129,16 +129,6 @@ def parse_yes_token_id(clob_token_ids: Any) -> str | None:
     token_ids = parse_json_field(clob_token_ids, default=[])
     if isinstance(token_ids, list) and token_ids:
         return str(token_ids[0]).strip() or None
-    return None
-
-
-def infer_genre_from_category(category_value: Any) -> str | None:
-    category_text = str(category_value or "").lower()
-    if not category_text:
-        return None
-    for genre, hints in CATEGORY_HINTS.items():
-        if any(hint in category_text for hint in hints):
-            return genre
     return None
 
 
@@ -212,9 +202,14 @@ def fetch_all_markets(requests_mgr: RequestManager, limit: int) -> list[dict[str
         for market in payload:
             market_id = str(market.get("id"))
             if market_id not in seen_ids:
+                volume = safe_float(market.get("volumeNum") or market.get("volume")) or 0.0
+                if volume < MIN_VOLUME:
+                    continue
+                if market_duration_days(market) < MIN_MARKET_DAYS:
+                    continue
                 fetched.append(market)
                 seen_ids.add(market_id)
-        if len(fetched) % 1000 == 0 or len(payload) < PAGE_SIZE:
+        if len(fetched) % 1000 == 0 and len(fetched) > 0 or len(payload) < PAGE_SIZE:
             print(f"  Fetched {len(fetched)} markets so far...", flush=True)
         if len(payload) < PAGE_SIZE:
             break
@@ -248,7 +243,7 @@ def fetch_missing_histories() -> list[dict[str, Any]]:
     with db_cursor() as connection:
         rows = connection.execute(
             """
-            SELECT rm.market_id, rm.yes_token_id
+            SELECT rm.market_id, rm.yes_token_id, rm.resolve_ts
             FROM raw_markets rm
             LEFT JOIN (
                 SELECT DISTINCT market_id FROM raw_price_history
@@ -259,7 +254,7 @@ def fetch_missing_histories() -> list[dict[str, Any]]:
             ORDER BY (rm.volume_total IS NULL), rm.volume_total DESC, rm.market_id
             """
         ).fetchall()
-    return [{"market_id": row["market_id"], "yes_token_id": row["yes_token_id"]} for row in rows]
+    return [{"market_id": row["market_id"], "yes_token_id": row["yes_token_id"], "resolve_ts": row["resolve_ts"]} for row in rows]
 
 
 def insert_price_history(market_id: str, history: list[dict[str, Any]]) -> int:
@@ -331,6 +326,37 @@ def fetch_all_price_histories_parallel(max_workers: int = 15) -> None:
             print(f"  Processed {completed}/{len(pending)} markets; inserted {total_points} history rows.", flush=True)
 
 
+def purge_insufficient_history() -> int:
+    """Delete markets from raw_markets whose price history doesn't span MIN_HISTORY_HOURS before resolve_ts."""
+    with db_cursor() as connection:
+        rows = connection.execute(
+            """
+            SELECT rm.market_id, rm.resolve_ts, MIN(rph.prob_ts) as earliest
+            FROM raw_markets rm
+            LEFT JOIN raw_price_history rph ON rph.market_id = rm.market_id
+            GROUP BY rm.market_id
+            """
+        ).fetchall()
+
+    purged = 0
+    for row in rows:
+        market_id = row["market_id"]
+        resolve_ts = row["resolve_ts"]
+        earliest = row["earliest"]
+        keep = False
+        if earliest and resolve_ts:
+            try:
+                keep = hours_between(resolve_ts, earliest) >= MIN_HISTORY_HOURS
+            except Exception:
+                pass
+        if not keep:
+            with db_cursor() as connection:
+                connection.execute("DELETE FROM raw_price_history WHERE market_id = ?", (market_id,))
+                connection.execute("DELETE FROM raw_markets WHERE market_id = ?", (market_id,))
+            purged += 1
+    return purged
+
+
 def main() -> None:
     args = parse_args()
     ensure_price_history_index()
@@ -347,6 +373,11 @@ def main() -> None:
         # Step 2: Fetch price histories from CLOB API (parallel)
         print(f"\n=== Step 2: Fetching price histories ({args.workers} threads) ===", flush=True)
         fetch_all_price_histories_parallel(max_workers=args.workers)
+
+        # Step 3: Purge markets with insufficient price history for snapshots
+        print(f"\n=== Step 3: Purging markets with < {MIN_HISTORY_HOURS}h of price history ===", flush=True)
+        purged = purge_insufficient_history()
+        print(f"Purged {purged} markets with insufficient history.", flush=True)
 
     except HardStopError as exc:
         print(str(exc))
