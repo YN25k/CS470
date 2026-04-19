@@ -3,20 +3,20 @@ Reference genre: other
 
                              Results: Logit
 ========================================================================
-Model:                 Logit              Method:             MLE       
-Dependent Variable:    outcome_binary     Pseudo R-squared:   0.470     
-Date:                  2026-04-15 22:24   AIC:                338.3161  
-No. Observations:      496                BIC:                359.3490  
-Df Model:              4                  Log-Likelihood:     -164.16   
-Df Residuals:          491                LL-Null:            -309.62   
-Converged:             1.0000             LLR p-value:        9.8556e-62
-No. Iterations:        7.0000             Scale:              1.0000    
+Model:                Logit              Method:             MLE        
+Dependent Variable:   outcome_binary     Pseudo R-squared:   0.448      
+Date:                 2026-04-18 15:38   AIC:                1378.3170  
+No. Observations:     1809               BIC:                1405.8196  
+Df Model:             4                  Log-Likelihood:     -684.16    
+Df Residuals:         1804               LL-Null:            -1238.6    
+Converged:            1.0000             LLR p-value:        9.0251e-239
+No. Iterations:       12.0000            Scale:              1.0000     
 ------------------------------------------------------------------------
-                         Coef.  Std.Err.    z     P>|z|   [0.025  0.975]
+                         Coef.  Std.Err.    z    P>|z|   [0.025   0.975]
 ------------------------------------------------------------------------
-const                   -3.6679   0.3375 -10.8678 0.0000 -4.3294 -3.0064
-probability_at_snapshot  8.0088   0.7540  10.6225 0.0000  6.5311  9.4866
-genre_economics         -0.6624   0.4263  -1.5538 0.1202 -1.4980  0.1731
-genre_politics          -1.5502   0.8818  -1.7580 0.0788 -3.2785  0.1781
-genre_sports            -0.3376   0.3890  -0.8678 0.3855 -1.1001  0.4249
+const                   -8.7813   2.2604 -3.8848 0.0001 -13.2117 -4.3510
+probability_at_snapshot 17.4601   4.5019  3.8784 0.0001   8.6365 26.2837
+genre_economics         -0.2148   0.1864 -1.1524 0.2492  -0.5802  0.1505
+genre_politics          -2.7698   2.7397 -1.0110 0.3120  -8.1395  2.5999
+genre_sports            -0.0678   7.5213 -0.0090 0.9928 -14.8093 14.6737
 ========================================================================

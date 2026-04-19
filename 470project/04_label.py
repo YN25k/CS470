@@ -12,7 +12,14 @@ RANDOM_SEED = 42
 def main() -> None:
     with db_cursor() as connection:
         rows = connection.execute(
-            "SELECT market_id, question, description, category FROM clean_markets ORDER BY market_id"
+            """
+            SELECT cm.market_id, cm.question, cm.description, cm.category
+            FROM clean_markets cm
+            WHERE EXISTS (
+                SELECT 1 FROM raw_price_history rph WHERE rph.market_id = cm.market_id
+            )
+            ORDER BY cm.market_id
+            """
         ).fetchall()
 
     # Label every market first

@@ -8,13 +8,22 @@ from typing import Any
 
 import requests
 
-from utils import db_cursor, hours_between, normalize_timestamp, parse_json_field, safe_float, unix_to_iso8601
+from utils import (
+    assign_genre_from_category,
+    assign_genre_from_text,
+    db_cursor,
+    hours_between,
+    normalize_timestamp,
+    parse_json_field,
+    safe_float,
+    unix_to_iso8601,
+)
 
 GAMMA_URL = "https://gamma-api.polymarket.com/markets"
 CLOB_URL = "https://clob.polymarket.com/prices-history"
 PAGE_SIZE = 100
-MIN_MARKET_DAYS = 2    # skip markets that ran for less than this many days (need 1d snapshot)
-MIN_VOLUME = 500       # skip markets with less than this total volume (USD)
+MIN_MARKET_DAYS = 1    # skip markets that ran for less than this many days (need 1d snapshot)
+MIN_VOLUME = 100       # skip markets with less than this total volume (USD); matches cleaning gate
 MIN_HISTORY_HOURS = 25 # require price data at least this many hours before resolve_ts
 
 
@@ -106,7 +115,7 @@ def market_duration_days(market: dict[str, Any]) -> float:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Collect Polymarket metadata and price history.")
-    parser.add_argument("--limit", type=int, default=10000, help="Total number of markets to fetch from Gamma API.")
+    parser.add_argument("--limit", type=int, default=50000, help="Total number of markets to fetch from Gamma API.")
     parser.add_argument("--workers", type=int, default=15, help="Number of parallel threads for CLOB price history.")
     return parser.parse_args()
 
@@ -385,9 +394,35 @@ def main() -> None:
     with db_cursor() as connection:
         raw_count = connection.execute("SELECT COUNT(*) FROM raw_markets").fetchone()[0]
         history_count = connection.execute("SELECT COUNT(DISTINCT market_id) FROM raw_price_history").fetchone()[0]
+        coverage_rows = connection.execute(
+            """
+            SELECT rm.market_id, rm.question, rm.description, rm.category,
+                   CASE WHEN rph.market_id IS NULL THEN 0 ELSE 1 END AS has_history
+            FROM raw_markets rm
+            LEFT JOIN (SELECT DISTINCT market_id FROM raw_price_history) rph
+                ON rph.market_id = rm.market_id
+            """
+        ).fetchall()
     print(f"\n=== Collection complete ===", flush=True)
     print(f"Raw markets: {raw_count}", flush=True)
     print(f"Markets with price history: {history_count}", flush=True)
+
+    per_genre_total: dict[str, int] = {}
+    per_genre_history: dict[str, int] = {}
+    for row in coverage_rows:
+        genre = assign_genre_from_category(row["category"])
+        if genre is None:
+            text = f"{row['question'] or ''} {row['description'] or ''}".strip()
+            genre = assign_genre_from_text(text)
+        per_genre_total[genre] = per_genre_total.get(genre, 0) + 1
+        per_genre_history[genre] = per_genre_history.get(genre, 0) + int(row["has_history"])
+
+    print("Per-genre CLOB coverage (raw):", flush=True)
+    for genre in ["politics", "economics", "sports", "other"]:
+        total = per_genre_total.get(genre, 0)
+        with_hist = per_genre_history.get(genre, 0)
+        pct = (with_hist / total * 100.0) if total else 0.0
+        print(f"  {genre}: {with_hist}/{total} ({pct:.1f}%)", flush=True)
 
 
 if __name__ == "__main__":

@@ -4,19 +4,19 @@ Reference genre: other
                              Results: Logit
 ========================================================================
 Model:                 Logit              Method:             MLE       
-Dependent Variable:    outcome_binary     Pseudo R-squared:   0.315     
-Date:                  2026-04-15 22:24   AIC:                439.2047  
-No. Observations:      506                BIC:                460.3374  
-Df Model:              4                  Log-Likelihood:     -214.60   
-Df Residuals:          501                LL-Null:            -313.38   
-Converged:             1.0000             LLR p-value:        1.2641e-41
-No. Iterations:        7.0000             Scale:              1.0000    
+Dependent Variable:    outcome_binary     Pseudo R-squared:   0.249     
+Date:                  2026-04-18 15:38   AIC:                840.7603  
+No. Observations:      839                BIC:                864.4214  
+Df Model:              4                  Log-Likelihood:     -415.38   
+Df Residuals:          834                LL-Null:            -553.17   
+Converged:             1.0000             LLR p-value:        2.0071e-58
+No. Iterations:        6.0000             Scale:              1.0000    
 ------------------------------------------------------------------------
                          Coef.  Std.Err.    z     P>|z|   [0.025  0.975]
 ------------------------------------------------------------------------
-const                   -3.3120   0.2989 -11.0812 0.0000 -3.8978 -2.7262
-probability_at_snapshot  6.9641   0.6723  10.3591 0.0000  5.6465  8.2817
-genre_economics         -0.6003   0.4070  -1.4748 0.1403 -1.3980  0.1975
-genre_politics          -0.6038   0.5772  -1.0461 0.2955 -1.7350  0.5274
-genre_sports            -0.1536   0.3252  -0.4723 0.6367 -0.7909  0.4838
+const                   -3.0436   0.2342 -12.9974 0.0000 -3.5025 -2.5846
+probability_at_snapshot  6.2001   0.4877  12.7125 0.0000  5.2442  7.1561
+genre_economics         -0.5771   0.3736  -1.5445 0.1225 -1.3094  0.1552
+genre_politics           0.4906   0.3702   1.3254 0.1850 -0.2349  1.2161
+genre_sports             0.3640   0.2665   1.3657 0.1720 -0.1584  0.8864
 ========================================================================

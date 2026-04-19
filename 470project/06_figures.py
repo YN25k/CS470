@@ -34,6 +34,14 @@ def bootstrap_ci(values: np.ndarray, n_boot: int = 500) -> tuple[float, float]:
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
+def wilson_interval(p: np.ndarray, n: np.ndarray, z: float = 1.96) -> tuple[np.ndarray, np.ndarray]:
+    n_safe = np.where(n > 0, n, 1)
+    denom = 1.0 + z ** 2 / n_safe
+    center = (p + z ** 2 / (2.0 * n_safe)) / denom
+    margin = (z * np.sqrt(p * (1.0 - p) / n_safe + z ** 2 / (4.0 * n_safe ** 2))) / denom
+    return np.clip(center - margin, 0.0, 1.0), np.clip(center + margin, 0.0, 1.0)
+
+
 def figure1_reliability(calibration_df: pd.DataFrame) -> None:
     ensure_directories()
     genres = GENRE_ORDER + [None]
@@ -44,24 +52,51 @@ def figure1_reliability(calibration_df: pd.DataFrame) -> None:
         subset = calibration_df[calibration_df["event_genre"].isna()] if genre is None else calibration_df[calibration_df["event_genre"] == genre]
         ax.plot([0, 1], [0, 1], linestyle="--", color="gray", linewidth=1)
         for horizon in HORIZON_ORDER:
-            horizon_df = subset[subset["snapshot_name"] == horizon].sort_values("bin_midpoint")
-            ax.plot(
-                horizon_df["bin_midpoint"],
-                horizon_df["empirical_rate"],
-                marker="o",
-                label=horizon,
-                color=COLORS[horizon],
+            horizon_df = (
+                subset[subset["snapshot_name"] == horizon]
+                .dropna(subset=["empirical_rate"])
+                .query("n_predictions > 0")
             )
-            if not horizon_df.empty:
-                n_text = int(horizon_df["n_predictions"].sum())
-                ax.text(0.04, 0.92 - 0.08 * HORIZON_ORDER.index(horizon), f"{horizon}: n={n_text}", transform=ax.transAxes, fontsize=8)
+            if horizon_df.empty:
+                continue
+            n = horizon_df["n_predictions"].to_numpy()
+            p = horizon_df["empirical_rate"].to_numpy()
+            x = horizon_df["bin_midpoint"].to_numpy()
+            lower, upper = wilson_interval(p, n)
+            lower_err = np.maximum(p - lower, 0.0)
+            upper_err = np.maximum(upper - p, 0.0)
+            sizes = np.clip(np.sqrt(n) * 14.0, 20.0, 400.0)
+            ax.errorbar(
+                x, p,
+                yerr=[lower_err, upper_err],
+                fmt="none",
+                ecolor=COLORS[horizon],
+                alpha=0.4,
+                capsize=3,
+                linewidth=1,
+            )
+            ax.scatter(
+                x, p,
+                s=sizes,
+                color=COLORS[horizon],
+                label=horizon,
+                alpha=0.75,
+                edgecolors="white",
+                linewidths=0.8,
+                zorder=3,
+            )
+            n_text = int(horizon_df["n_predictions"].sum())
+            ax.text(0.04, 0.92 - 0.08 * HORIZON_ORDER.index(horizon), f"{horizon}: n={n_text}", transform=ax.transAxes, fontsize=8)
         ax.set_title(label.title())
         ax.set_xlabel("Predicted probability")
         ax.set_ylabel("Empirical rate")
-        ax.legend()
+        ax.set_xlim(-0.02, 1.02)
+        ax.set_ylim(-0.02, 1.02)
+        ax.legend(loc="lower right")
     for ax in axes[len(genres):]:
         ax.axis("off")
-    fig.tight_layout()
+    fig.suptitle("Reliability (dot size \u221d sample count, bars: 95% Wilson CI)", fontsize=11, y=0.995)
+    fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(FIGURES_DIR / "figure1_reliability.png", dpi=300)
     plt.close(fig)
 
@@ -190,10 +225,10 @@ def main() -> None:
     decomp_df = load_table("SELECT * FROM brier_decomposition")
     snapshot_df = load_table(
         """
-        SELECT ms.*, cm.volume_total, COALESCE(l.event_genre, 'other') AS event_genre
+        SELECT ms.*, cm.volume_total, l.event_genre AS event_genre
         FROM market_snapshots ms
         JOIN clean_markets cm ON cm.market_id = ms.market_id
-        LEFT JOIN labels l ON l.market_id = ms.market_id
+        JOIN labels l ON l.market_id = ms.market_id
         WHERE ms.is_stale = 0
         """
     )

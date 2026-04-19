@@ -10,6 +10,12 @@ HORIZONS = {
     "1d": 24,
 }
 
+STALE_THRESHOLDS = {
+    "1h": 3.0,
+    "12h": 12.0,
+    "1d": 24.0,
+}
+
 
 def main() -> None:
     total_created = 0
@@ -39,7 +45,7 @@ def main() -> None:
                 source_prob_ts = history_row["prob_ts"]
                 probability = float(history_row["probability"])
                 gap_hours = hours_between(snapshot_ts, source_prob_ts)
-                is_stale = int(gap_hours > 12)
+                is_stale = int(gap_hours > STALE_THRESHOLDS[snapshot_name])
                 brier_score = (probability - market["outcome_binary"]) ** 2
                 log_loss = compute_log_loss(probability, market["outcome_binary"])
 

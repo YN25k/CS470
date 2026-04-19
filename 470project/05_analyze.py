@@ -32,10 +32,10 @@ def load_dataframe(include_stale: bool) -> pd.DataFrame:
             cm.outcome_binary,
             cm.volume_total,
             cm.liquidity_raw,
-            COALESCE(l.event_genre, 'other') AS event_genre
+            l.event_genre AS event_genre
         FROM market_snapshots ms
         JOIN clean_markets cm ON cm.market_id = ms.market_id
-        LEFT JOIN labels l ON l.market_id = ms.market_id
+        JOIN labels l ON l.market_id = ms.market_id
     """
     conditions: list[str] = []
     if not include_stale:
