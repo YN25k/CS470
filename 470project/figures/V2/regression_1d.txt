@@ -1,0 +1,21 @@
+Model used: fallback model without interactions
+Reference genre: politics
+
+                             Results: Logit
+========================================================================
+Model:                 Logit              Method:             MLE       
+Dependent Variable:    outcome_binary     Pseudo R-squared:   0.338     
+Date:                  2026-04-20 04:47   AIC:                851.2019  
+No. Observations:      1021               BIC:                870.9161  
+Df Model:              3                  Log-Likelihood:     -421.60   
+Df Residuals:          1017               LL-Null:            -637.20   
+Converged:             1.0000             LLR p-value:        3.8678e-93
+No. Iterations:        7.0000             Scale:              1.0000    
+------------------------------------------------------------------------
+                         Coef.  Std.Err.    z     P>|z|   [0.025  0.975]
+------------------------------------------------------------------------
+const                   -3.3230   0.2172 -15.3008 0.0000 -3.7487 -2.8974
+probability_at_snapshot  7.0878   0.4935  14.3609 0.0000  6.1204  8.0551
+genre_economics         -0.5870   0.2763  -2.1243 0.0336 -1.1286 -0.0454
+genre_sports             0.1038   0.2028   0.5121 0.6086 -0.2936  0.5013
+========================================================================
