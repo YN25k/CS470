@@ -31,12 +31,6 @@ CATEGORY_MAP = {
     "business": "economics",
     "economics": "economics",
     "finance": "economics",
-    "art": "other",
-    "culture": "other",
-    "entertainment": "other",
-    "media": "other",
-    "music": "other",
-    "movies": "other",
 }
 
 KEYWORDS = {
@@ -59,16 +53,9 @@ KEYWORDS = {
         "hockey", "tennis", "golf", "ufc", "boxing", "olympic", "world cup", "premier league", "team",
         "coach", "player", "draft", "trade deadline", "win the", "defeat", "score",
     ],
-    "other": [
-        "oscar", "emmy", "grammy", "tony", "golden globe", "box office", "movie", "film", "tv show",
-        "streaming", "album", "song", "chart", "billboard", "book", "bestseller", "nobel prize",
-        "pulitzer", "social media", "tiktok", "youtube", "viral", "celebrity", "award", "entertainment",
-        "concert", "tour", "festival", "game of the year",
-        "temperature", "weather", "rainfall", "humidity", "forecast", "celsius", "fahrenheit",
-    ],
 }
 
-PRIORITY = ["politics", "economics", "sports", "other"]
+PRIORITY = ["politics", "economics", "sports"]
 
 
 def ensure_directories() -> None:
@@ -173,7 +160,7 @@ def normalize_question(text: str) -> str:
     return lowered.strip()
 
 
-def assign_genre_from_text(text: str) -> str:
+def assign_genre_from_text(text: str) -> str | None:
     lowered = (text or "").lower()
     scores: dict[str, int] = {genre: 0 for genre in PRIORITY}
     for genre, keywords in KEYWORDS.items():
@@ -182,12 +169,11 @@ def assign_genre_from_text(text: str) -> str:
                 scores[genre] += 1
     max_score = max(scores.values())
     if max_score == 0:
-        return "other"
-    # Tiebreak using PRIORITY order
+        return None
     for genre in PRIORITY:
         if scores[genre] == max_score:
             return genre
-    return "other"
+    return None
 
 
 def assign_genre_from_category(category: str | None) -> str | None:

@@ -22,8 +22,9 @@ def main() -> None:
             """
         ).fetchall()
 
-    # Label every market first
+    # Label every market first; skip markets that don't fit any genre
     labeled: list[tuple[str, str, str]] = []  # (market_id, genre, label_method)
+    skipped = 0
     for row in rows:
         combined_text = f"{row['question'] or ''} {row['description'] or ''}".strip()
         category_genre = assign_genre_from_category(row["category"])
@@ -33,7 +34,11 @@ def main() -> None:
         else:
             genre = assign_genre_from_text(combined_text)
             label_method = "keyword_rule"
+        if genre is None:
+            skipped += 1
+            continue
         labeled.append((row["market_id"], genre, label_method))
+    print(f"Skipped {skipped} markets with no matching genre (no longer using 'other').")
 
     # Downsample over-represented genres
     rng = random.Random(RANDOM_SEED)
@@ -70,14 +75,12 @@ def main() -> None:
     print(f"Balanced label counts (cap={MAX_PER_GENRE} per genre, seed={RANDOM_SEED}):")
     for genre, count in sorted(distribution.items()):
         print(f"  {genre}: {count} ({count / total:.1%})")
-    for genre in ["politics", "sports", "economics", "other"]:
+    for genre in ["politics", "sports", "economics"]:
         if genre not in examples:
             continue
         print(f"\nExamples for {genre}:")
         for question in examples[genre]:
             print(f"  - {question}")
-    if distribution.get("other", 0):
-        print("\nFlagged 'other' markets for manual review.")
 
 
 if __name__ == "__main__":

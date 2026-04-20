@@ -1,22 +1,21 @@
 Model used: fallback model without interactions
-Reference genre: other
+Reference genre: economics
 
                              Results: Logit
 ========================================================================
 Model:                 Logit              Method:             MLE       
-Dependent Variable:    outcome_binary     Pseudo R-squared:   0.142     
-Date:                  2026-04-18 15:38   AIC:                2107.7807 
-No. Observations:      1786               BIC:                2135.2194 
-Df Model:              4                  Log-Likelihood:     -1048.9   
-Df Residuals:          1781               LL-Null:            -1222.6   
-Converged:             1.0000             LLR p-value:        6.4059e-74
+Dependent Variable:    outcome_binary     Pseudo R-squared:   0.194     
+Date:                  2026-04-19 20:42   AIC:                1299.7799 
+No. Observations:      1179               BIC:                1320.0696 
+Df Model:              3                  Log-Likelihood:     -645.89   
+Df Residuals:          1175               LL-Null:            -801.68   
+Converged:             1.0000             LLR p-value:        3.0970e-67
 No. Iterations:        6.0000             Scale:              1.0000    
 ------------------------------------------------------------------------
                          Coef.  Std.Err.    z     P>|z|   [0.025  0.975]
 ------------------------------------------------------------------------
-const                   -2.9992   0.2162 -13.8700 0.0000 -3.4230 -2.5754
-probability_at_snapshot  6.0300   0.4358  13.8366 0.0000  5.1758  6.8841
-genre_economics         -0.2675   0.1739  -1.5385 0.1239 -0.6083  0.0733
-genre_politics           0.3770   0.3614   1.0432 0.2968 -0.3313  1.0852
-genre_sports             0.4467   0.2343   1.9065 0.0566 -0.0125  0.9060
+const                   -2.8867   0.2542 -11.3567 0.0000 -3.3849 -2.3885
+probability_at_snapshot  5.8306   0.4754  12.2634 0.0000  4.8988  6.7625
+genre_politics          -0.1127   0.2485  -0.4534 0.6503 -0.5998  0.3744
+genre_sports             0.2436   0.1483   1.6421 0.1006 -0.0472  0.5343
 ========================================================================

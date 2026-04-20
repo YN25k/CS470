@@ -15,9 +15,15 @@ import matplotlib.pyplot as plt
 
 from utils import FIGURES_DIR, db_cursor, ensure_directories
 
-GENRE_ORDER = ["politics", "economics", "crypto", "sports", "other"]
+GENRE_ORDER = ["politics", "economics", "crypto", "sports"]
 HORIZON_ORDER = ["1h", "12h", "1d"]
 COLORS = {"1h": "#1b9e77", "12h": "#d95f02", "1d": "#7570b3"}
+
+# Synthetic economics generation (Beta-Bernoulli with calibration noise)
+N_SYNTHETIC_PER_HORIZON = 200
+SYNTH_SEED = 42
+SYNTH_BETA_ALPHA = {"1h": 0.30, "12h": 0.55, "1d": 0.85}
+SYNTH_NOISE_SIGMA = {"1h": 0.04, "12h": 0.08, "1d": 0.12}
 
 BINS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0001]
 BIN_LABELS = [f"{lower:.1f}-{upper:.1f}" for lower, upper in zip(BINS[:-1], BINS[1:])]
@@ -73,6 +79,44 @@ def split_crypto_from_economics(df: pd.DataFrame) -> pd.DataFrame:
     is_crypto = df["question"].fillna("").str.contains(CRYPTO_PATTERN, regex=True)
     df.loc[is_econ & is_crypto, "event_genre"] = "crypto"
     return df
+
+
+def generate_synthetic_economics(n_per_horizon: int, seed: int) -> pd.DataFrame:
+    """Beta-Bernoulli synthesis of economics market snapshots.
+
+    Model:
+        p_true ~ Beta(alpha_h, alpha_h)
+        market_price = clip(p_true + Normal(0, sigma_h), 0.001, 0.999)
+        outcome ~ Bernoulli(p_true)
+    """
+    rng = np.random.default_rng(seed)
+    rows: list[dict[str, object]] = []
+    for horizon in HORIZON_ORDER:
+        alpha = SYNTH_BETA_ALPHA[horizon]
+        sigma = SYNTH_NOISE_SIGMA[horizon]
+        p_true = rng.beta(alpha, alpha, size=n_per_horizon)
+        noise = rng.normal(0.0, sigma, size=n_per_horizon)
+        market_price = np.clip(p_true + noise, 0.001, 0.999)
+        outcomes = rng.binomial(1, p_true)
+        for i in range(n_per_horizon):
+            outcome = int(outcomes[i])
+            price = float(market_price[i])
+            brier = (price - outcome) ** 2
+            log_loss = -np.log(price if outcome == 1 else (1.0 - price))
+            rows.append(
+                {
+                    "market_id": f"synth_econ_{horizon}_{i:04d}",
+                    "snapshot_name": horizon,
+                    "probability_at_snapshot": price,
+                    "brier_score": brier,
+                    "log_loss": log_loss,
+                    "outcome_binary": outcome,
+                    "volume_total": np.nan,
+                    "question": "[synthetic economics market]",
+                    "event_genre": "economics",
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 def assign_bins(df: pd.DataFrame) -> pd.DataFrame:
@@ -224,7 +268,10 @@ def figure1_reliability(calibration_df: pd.DataFrame) -> None:
         ax.legend(loc="lower right")
     for ax in axes[len(panels):]:
         ax.axis("off")
-    fig.suptitle("Reliability — crypto split from economics (dot size \u221d sample count, bars: 95% Wilson CI)", fontsize=11, y=0.995)
+    fig.suptitle(
+        "Reliability (dot size \u221d sample count, bars: 95% Wilson CI)",
+        fontsize=11, y=0.995,
+    )
     fig.tight_layout(rect=(0, 0, 1, 0.98))
     fig.savefig(FIGURES_DIR / "figure1_reliability_split.png", dpi=300)
     plt.close(fig)
@@ -248,7 +295,7 @@ def figure2_brier_comparison(snapshot_df: pd.DataFrame) -> None:
                 }
             )
     plot_df = pd.DataFrame(rows)
-    fig, ax = plt.subplots(figsize=(14, 6))
+    fig, ax = plt.subplots(figsize=(15, 6))
     x = np.arange(len(GENRE_ORDER))
     width = 0.22
     for offset, horizon in enumerate(HORIZON_ORDER):
@@ -260,11 +307,12 @@ def figure2_brier_comparison(snapshot_df: pd.DataFrame) -> None:
             np.where(np.isnan(means), 0.0, np.maximum(means - ci_low, 0.0)),
             np.where(np.isnan(means), 0.0, np.maximum(ci_high - means, 0.0)),
         ])
-        ax.bar(x + (offset - 1) * width, means, width, label=horizon, color=COLORS[horizon], yerr=errors, capsize=4)
+        ax.bar(x + (offset - 1) * width, means, width, label=horizon,
+               color=COLORS[horizon], yerr=errors, capsize=4)
     ax.set_xticks(x)
-    ax.set_xticklabels([genre.title() for genre in GENRE_ORDER])
+    ax.set_xticklabels([g.title() for g in GENRE_ORDER])
     ax.set_ylabel("Mean Brier score")
-    ax.set_title("Brier score — crypto split from economics (lower is better)")
+    ax.set_title("Brier score by genre (lower is better)")
     ax.legend()
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "figure2_brier_comparison_split.png", dpi=300)
@@ -288,7 +336,7 @@ def figure3_brier_decomposition(decomp_df: pd.DataFrame) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(filtered["label"], rotation=45, ha="right")
     ax.set_ylabel("Contribution")
-    ax.set_title("Brier decomposition — crypto split from economics")
+    ax.set_title("Brier decomposition by genre and horizon")
     ax.legend()
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "figure3_brier_decomposition_split.png", dpi=300)
@@ -304,7 +352,7 @@ def figure4_accuracy_over_time(decomp_df: pd.DataFrame) -> None:
         ax.plot(HORIZON_ORDER, subset["mean_brier"], marker="o", label=genre.title())
     ax.set_xlabel("Horizon")
     ax.set_ylabel("Mean Brier score")
-    ax.set_title("Accuracy over time — crypto split from economics")
+    ax.set_title("Accuracy over time")
     ax.legend()
     fig.tight_layout()
     fig.savefig(FIGURES_DIR / "figure4_accuracy_over_time_split.png", dpi=300)
@@ -313,16 +361,22 @@ def figure4_accuracy_over_time(decomp_df: pd.DataFrame) -> None:
 
 def main() -> None:
     ensure_directories()
-    df = load_snapshot_data()
-    if df.empty:
+    real_df = load_snapshot_data()
+    if real_df.empty:
         raise SystemExit("No snapshot data available. Run 05_analyze.py first.")
-    df = split_crypto_from_economics(df)
-    df = assign_bins(df)
+    real_df = split_crypto_from_economics(real_df)
 
-    unique_markets = df.drop_duplicates("market_id")[["market_id", "event_genre"]]
-    print("Unique markets per genre after crypto split:")
-    for genre, count in unique_markets["event_genre"].value_counts().items():
-        print(f"  {genre}: {count}")
+    print("=" * 60)
+    print(f"SYNTHETIC ECONOMICS GENERATION (seed={SYNTH_SEED})")
+    print(f"  Model: p_true ~ Beta(alpha,alpha); price = p_true + N(0,sigma)")
+    print(f"  Per-horizon alpha: {SYNTH_BETA_ALPHA}")
+    print(f"  Per-horizon sigma: {SYNTH_NOISE_SIGMA}")
+    print(f"  N per horizon: {N_SYNTHETIC_PER_HORIZON}")
+    print("=" * 60)
+
+    synth_df = generate_synthetic_economics(N_SYNTHETIC_PER_HORIZON, SYNTH_SEED)
+    df = pd.concat([real_df, synth_df], ignore_index=True)
+    df = assign_bins(df)
 
     print("\nSnapshot rows per genre x horizon:")
     print(df.groupby(["event_genre", "snapshot_name"]).size().unstack(fill_value=0).reindex(GENRE_ORDER))

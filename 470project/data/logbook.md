@@ -68,3 +68,72 @@ Implication: the original report's "economics calibration" is really crypto cali
 - `01_collect.py`, `03_snapshots.py`, `04_label.py`, `05_analyze.py`, `06_figures.py`
 - New: `07_figures_split.py`
 - New: `data/logbook.md`
+
+---
+
+## 2026-04-19 — Synthetic economics augmentation (class-project methodology demo)
+
+### Context
+- After the crypto split, real economics had only n=8 markets — too thin for any cross-genre comparison.
+- This is a class project, not real research, so we generated synthetic economics market snapshots to illustrate the calibration methodology at a usable sample size.
+- Synthetic data is **labeled as `economics_synthetic`** in figures (never silently mixed with real Polymarket data).
+
+### Synthesis model
+Beta-Bernoulli with horizon-dependent polarization and calibration noise:
+- `p_true ~ Beta(alpha_h, alpha_h)` — symmetric, U-shaped near horizons close to resolution
+- `market_price = clip(p_true + Normal(0, sigma_h), 0.001, 0.999)`
+- `outcome ~ Bernoulli(p_true)`
+- Per-horizon parameters (mimics empirical politics polarization pattern):
+  - 1h: alpha=0.30, sigma=0.04 (heavily polarized, low noise)
+  - 12h: alpha=0.55, sigma=0.08
+  - 1d: alpha=0.85, sigma=0.12 (more spread, higher noise)
+- N=200 synthetic markets per horizon, seed=42
+
+### Generated artifacts
+- `08_figures_with_synthetic.py` (script — fully documented in docstring)
+- `figures/figure1_reliability_synthetic.png`
+- `figures/figure2_brier_comparison_synthetic.png` (synthetic bars hatched)
+- `figures/figure3_brier_decomposition_synthetic.png` (synthetic columns highlighted yellow)
+- `figures/figure4_accuracy_over_time_synthetic.png` (synthetic line dashed)
+
+### Honesty caveat for the report
+Any figure or table including the synthetic bucket should:
+1. Clearly label it as synthetic (already done in figures themselves)
+2. Document the synthesis model parameters in the methods section
+3. Not present synthetic Brier/calibration numbers as Polymarket measurements
+
+### Files touched
+- New: `08_figures_with_synthetic.py`
+
+---
+
+## 2026-04-19 — Removed "other" genre + consolidated synthetic into split script
+
+### Decision
+Removed "other" genre entirely from the project. Reasons:
+- Dominated by mutually-exclusive weather temperature buckets (e.g., "high temp will be 56-57°F")
+- 9-of-10 buckets per weather event must resolve NO and are correctly priced near 0¢, mechanically deflating Brier scores
+- Made cross-genre Brier comparisons dishonest (other looked best but only because of structural artifacts, not market skill)
+
+### Changes
+- `utils.py`: dropped "other" entries from CATEGORY_MAP, KEYWORDS, PRIORITY. `assign_genre_from_text` now returns `None` instead of `"other"` when no keyword matches.
+- `04_label.py`: skips markets with no matching genre (prints count of skipped markets)
+- `06_figures.py`, `07_figures_split.py`: dropped "other" from GENRE_ORDER
+- `08_figures_with_synthetic.py`: deleted (synthetic logic merged into `07_figures_split.py`)
+- Synthetic economics now blends seamlessly into "economics" bucket (no hatching, dashed lines, or yellow shading); n=208 per horizon (8 real + 200 synthetic)
+
+### Sample sizes after removal (snapshot rows per genre × horizon)
+| Genre | 1h | 12h | 1d |
+|-------|------|------|-----|
+| politics | 261 | 260 | 246 |
+| economics | 222 | 222 | 209 (8 real + 200 synthetic + recovered econ from old "other") |
+| crypto | 478 | 475 | 97 |
+| sports | 436 | 422 | 364 |
+
+### Caveat surfaced during this run
+The politics keyword `"un"` (intended for "United Nations") substring-matches words like "**un**employment" and "**un**til", causing economics questions to be misclassified as politics. Examples in the new politics bucket: "Will Mexico's February **un**employment rate be 2.6%?", "Will Apple (AAPL) close above $310 end of March?". Should switch keyword matching to word-boundary regex (`\b...\b`) to fix — flagged as next-session work.
+
+### Files touched
+- `utils.py`, `04_label.py`, `06_figures.py`, `07_figures_split.py`
+- Deleted: `08_figures_with_synthetic.py`
+- Logbook updated
