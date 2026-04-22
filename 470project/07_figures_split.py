@@ -18,6 +18,7 @@ from utils import FIGURES_DIR, db_cursor, ensure_directories
 GENRE_ORDER = ["politics", "economics", "crypto", "sports"]
 HORIZON_ORDER = ["1h", "12h", "1d"]
 COLORS = {"1h": "#1b9e77", "12h": "#d95f02", "1d": "#7570b3"}
+HORIZON_X_OFFSET = {"1h": -0.022, "12h": 0.0, "1d": 0.022}
 
 # Synthetic economics generation (Beta-Bernoulli with calibration noise)
 N_SYNTHETIC_PER_HORIZON = 200
@@ -230,7 +231,7 @@ def figure1_reliability(calibration_df: pd.DataFrame) -> None:
                 continue
             n = horizon_df["n_predictions"].to_numpy()
             p = horizon_df["empirical_rate"].to_numpy()
-            x = horizon_df["bin_midpoint"].to_numpy()
+            x = horizon_df["bin_midpoint"].to_numpy() + HORIZON_X_OFFSET[horizon]
             lower, upper = wilson_interval(p, n)
             lower_err = np.maximum(p - lower, 0.0)
             upper_err = np.maximum(upper - p, 0.0)
