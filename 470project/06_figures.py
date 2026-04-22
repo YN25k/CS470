@@ -25,13 +25,15 @@ def load_table(query: str) -> pd.DataFrame:
         return pd.read_sql_query(query, connection)
 
 
-def bootstrap_ci(values: np.ndarray, n_boot: int = 500) -> tuple[float, float]:
-    if len(values) == 0:
+def bootstrap_ci(values: np.ndarray, n_boot: int = 10_000, seed: int = 42) -> tuple[float, float]:
+    """Vectorized 95% bootstrap CI for a scalar mean (per IMPLEMENTATION_SPEC.md)."""
+    values = np.asarray(values, dtype=float)
+    n = len(values)
+    if n == 0:
         return (np.nan, np.nan)
-    means = []
-    for _ in range(n_boot):
-        sample = np.random.choice(values, size=len(values), replace=True)
-        means.append(float(np.mean(sample)))
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, n, size=(n_boot, n))
+    means = values[idx].mean(axis=1)
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 

@@ -1,0 +1,32 @@
+Genre: politics
+k = 4
+Silhouette: 0.2185
+Cluster sizes: [30, 138, 49, 44]
+
+--- Cluster 0 (n=30) ---
+  - Will Lions win?
+  - Who will finish higher: Perez or Bottas?
+  - Who will finish higher: Leclerc or Verstappen?
+  - Who will finish higher: Leclerc or Piastri?
+  - Will Fidesz-KDNP win at least 90 seats?
+
+--- Cluster 1 (n=138) ---
+  - Will the highest temperature in Dallas be between 82-83°F on March 20?
+  - Will the highest temperature in Atlanta be between 86-87°F on March 26?
+  - Will the highest temperature in Miami be between 88-89°F on March 26?
+  - Will the highest temperature in Ankara be 16°C on March 26?
+  - Will the highest temperature in Madrid be 20°C on March 26?
+
+--- Cluster 2 (n=49) ---
+  - Will Doug Burgum be the next to leave the Trump Cabinet before 2027?
+  - Will Russia enter Shevchenko by March 31?
+  - Will MrBeast's next video get less than 40 million views on week 1?
+  - Will Ted Cruz post 140-159 posts from March 20 to March 27, 2026?
+  - Will "Man I Need - Olivia Dean" be the #1 song on Spotify this week?
+
+--- Cluster 3 (n=44) ---
+  - Will Mexico’s February unemployment rate be 2.6%?
+  - Will Opendoor (OPEN) close above $1.00 end of March?
+  - Will Google (GOOGL) close above $320 end of March?
+  - Will Apple (AAPL) close above $310 end of March?
+  - Over $20M committed to the P2P Protocol public sale?

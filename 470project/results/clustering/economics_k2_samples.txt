@@ -1,0 +1,18 @@
+Genre: economics
+k = 2
+Silhouette: 0.3172
+Cluster sizes: [170, 330]
+
+--- Cluster 0 (n=170) ---
+  - Jerome Powell out as Fed Chair by March 31, 2026?
+  - Solana Up or Down - March 18, 7:15PM-7:20PM ET
+  - Solana Up or Down - March 20, 2:45PM-2:50PM ET
+  - XRP Up or Down - March 20, 3:15PM-3:30PM ET
+  - Hyperliquid Up or Down - March 20, 7:30PM-7:35PM ET
+
+--- Cluster 1 (n=330) ---
+  - Will Ethereum reach $3,200 in March?
+  - Bitcoin Up or Down - March 21, 2:30AM-2:45AM ET
+  - Ethereum Up or Down - March 21, 1:20PM-1:25PM ET
+  - Bitcoin Up or Down - March 21, 4:20PM-4:25PM ET
+  - Will the price of Ethereum be above $1,900 on March 29?

@@ -1,21 +1,25 @@
-Model used: fallback model without interactions
+Model used: full model with interactions
 Reference genre: economics
 
-                             Results: Logit
-========================================================================
-Model:                 Logit              Method:             MLE       
-Dependent Variable:    outcome_binary     Pseudo R-squared:   0.194     
-Date:                  2026-04-19 20:42   AIC:                1299.7799 
-No. Observations:      1179               BIC:                1320.0696 
-Df Model:              3                  Log-Likelihood:     -645.89   
-Df Residuals:          1175               LL-Null:            -801.68   
-Converged:             1.0000             LLR p-value:        3.0970e-67
-No. Iterations:        6.0000             Scale:              1.0000    
-------------------------------------------------------------------------
-                         Coef.  Std.Err.    z     P>|z|   [0.025  0.975]
-------------------------------------------------------------------------
-const                   -2.8867   0.2542 -11.3567 0.0000 -3.3849 -2.3885
-probability_at_snapshot  5.8306   0.4754  12.2634 0.0000  4.8988  6.7625
-genre_politics          -0.1127   0.2485  -0.4534 0.6503 -0.5998  0.3744
-genre_sports             0.2436   0.1483   1.6421 0.1006 -0.0472  0.5343
-========================================================================
+                               Results: Logit
+============================================================================
+Model:                  Logit               Method:              MLE        
+Dependent Variable:     outcome_binary      Pseudo R-squared:    0.278      
+Date:                   2026-04-22 16:36    AIC:                 1577.8242  
+No. Observations:       1579                BIC:                 1620.7406  
+Df Model:               7                   Log-Likelihood:      -780.91    
+Df Residuals:           1571                LL-Null:             -1080.9    
+Converged:              1.0000              LLR p-value:         2.5342e-125
+No. Iterations:         8.0000              Scale:               1.0000     
+----------------------------------------------------------------------------
+                              Coef.  Std.Err.    z    P>|z|   [0.025  0.975]
+----------------------------------------------------------------------------
+const                        -2.4736   0.4446 -5.5639 0.0000 -3.3449 -1.6022
+probability_at_snapshot       5.1200   0.6215  8.2387 0.0000  3.9020  6.3381
+log_volume                   -0.0047   0.0327 -0.1451 0.8846 -0.0688  0.0593
+log_liquidity                -0.0178   0.0396 -0.4491 0.6533 -0.0953  0.0598
+genre_politics               -1.3062   0.4653 -2.8072 0.0050 -2.2181 -0.3942
+genre_sports                  0.5243   0.4182  1.2538 0.2099 -0.2953  1.3439
+genre_politics_x_probability  3.0099   0.9525  3.1599 0.0016  1.1430  4.8769
+genre_sports_x_probability   -0.8140   0.8454 -0.9628 0.3356 -2.4710  0.8430
+============================================================================

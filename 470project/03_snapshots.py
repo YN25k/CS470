@@ -5,7 +5,11 @@ from collections import Counter
 from utils import compute_log_loss, db_cursor, hours_between, shift_timestamp
 
 HORIZONS = {
-    "1h": 1,
+    # NOTE: the "1h" bucket actually snapshots 3 hours before resolution to
+    # avoid the post-event resolution-lag artifact (sports markets especially
+    # have already locked at 0/1 one hour before the official resolve_ts).
+    # Label kept as "1h" for downstream compatibility; see logbook.
+    "1h": 3,
     "12h": 12,
     "1d": 24,
 }

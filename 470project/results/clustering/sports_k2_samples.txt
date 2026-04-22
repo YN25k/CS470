@@ -1,0 +1,18 @@
+Genre: sports
+k = 2
+Silhouette: 0.0706
+Cluster sizes: [54, 382]
+
+--- Cluster 0 (n=54) ---
+  - Spread: Norwich City FC (-1.5)
+  - Spread: Middlesbrough FC (-2.5)
+  - Spread: FK Jablonec (-1.5)
+  - Spread: Querétaro FC (-2.5)
+  - Spread: CR Brasil (-2.5)
+
+--- Cluster 1 (n=382) ---
+  - Islanders vs. Senators
+  - Ulsan HD FC vs. FC Seoul: O/U 3.5
+  - Blackhawks vs. Flyers
+  - Will Türkiye vs. Romania end in a draw?
+  - Saudi Arabia vs. Egypt: O/U 2.5

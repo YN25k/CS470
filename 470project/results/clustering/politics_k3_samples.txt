@@ -1,0 +1,25 @@
+Genre: politics
+k = 3
+Silhouette: 0.2085
+Cluster sizes: [43, 138, 80]
+
+--- Cluster 0 (n=43) ---
+  - Will Opendoor (OPEN) close above $1.00 end of March?
+  - Will Google (GOOGL) close above $320 end of March?
+  - Will Apple (AAPL) close above $310 end of March?
+  - Over $20M committed to the P2P Protocol public sale?
+  - Will Microsoft (MSFT) close at <$340 on the final day of trading of the week of Mar 23 – Mar 27?
+
+--- Cluster 1 (n=138) ---
+  - Will the highest temperature in Dallas be between 82-83°F on March 20?
+  - Will the highest temperature in Atlanta be between 86-87°F on March 26?
+  - Will the highest temperature in Miami be between 88-89°F on March 26?
+  - Will the highest temperature in Ankara be 16°C on March 26?
+  - Will the highest temperature in Madrid be 20°C on March 26?
+
+--- Cluster 2 (n=80) ---
+  - Will Mexico’s February unemployment rate be 2.6%?
+  - Will Lions win?
+  - Will Doug Burgum be the next to leave the Trump Cabinet before 2027?
+  - Will Russia enter Shevchenko by March 31?
+  - Who will finish higher: Perez or Bottas?

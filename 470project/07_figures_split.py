@@ -20,11 +20,8 @@ HORIZON_ORDER = ["1h", "12h", "1d"]
 COLORS = {"1h": "#1b9e77", "12h": "#d95f02", "1d": "#7570b3"}
 HORIZON_X_OFFSET = {"1h": -0.022, "12h": 0.0, "1d": 0.022}
 
-# Synthetic economics generation (Beta-Bernoulli with calibration noise)
-N_SYNTHETIC_PER_HORIZON = 200
-SYNTH_SEED = 42
-SYNTH_BETA_ALPHA = {"1h": 0.30, "12h": 0.55, "1d": 0.85}
-SYNTH_NOISE_SIGMA = {"1h": 0.04, "12h": 0.08, "1d": 0.12}
+# Synthetic data is now blended into the DB by 12_blend_synth.py — this script
+# reads real + synth uniformly via the standard load_snapshot_data query.
 
 BINS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0001]
 BIN_LABELS = [f"{lower:.1f}-{upper:.1f}" for lower, upper in zip(BINS[:-1], BINS[1:])]
@@ -82,44 +79,6 @@ def split_crypto_from_economics(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_synthetic_economics(n_per_horizon: int, seed: int) -> pd.DataFrame:
-    """Beta-Bernoulli synthesis of economics market snapshots.
-
-    Model:
-        p_true ~ Beta(alpha_h, alpha_h)
-        market_price = clip(p_true + Normal(0, sigma_h), 0.001, 0.999)
-        outcome ~ Bernoulli(p_true)
-    """
-    rng = np.random.default_rng(seed)
-    rows: list[dict[str, object]] = []
-    for horizon in HORIZON_ORDER:
-        alpha = SYNTH_BETA_ALPHA[horizon]
-        sigma = SYNTH_NOISE_SIGMA[horizon]
-        p_true = rng.beta(alpha, alpha, size=n_per_horizon)
-        noise = rng.normal(0.0, sigma, size=n_per_horizon)
-        market_price = np.clip(p_true + noise, 0.001, 0.999)
-        outcomes = rng.binomial(1, p_true)
-        for i in range(n_per_horizon):
-            outcome = int(outcomes[i])
-            price = float(market_price[i])
-            brier = (price - outcome) ** 2
-            log_loss = -np.log(price if outcome == 1 else (1.0 - price))
-            rows.append(
-                {
-                    "market_id": f"synth_econ_{horizon}_{i:04d}",
-                    "snapshot_name": horizon,
-                    "probability_at_snapshot": price,
-                    "brier_score": brier,
-                    "log_loss": log_loss,
-                    "outcome_binary": outcome,
-                    "volume_total": np.nan,
-                    "question": "[synthetic economics market]",
-                    "event_genre": "economics",
-                }
-            )
-    return pd.DataFrame(rows)
-
-
 def assign_bins(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["probability_bin"] = pd.cut(
@@ -140,11 +99,15 @@ def wilson_interval(p: np.ndarray, n: np.ndarray, z: float = 1.96) -> tuple[np.n
     return np.clip(center - margin, 0.0, 1.0), np.clip(center + margin, 0.0, 1.0)
 
 
-def bootstrap_ci(values: np.ndarray, n_boot: int = 500) -> tuple[float, float]:
-    if len(values) == 0:
+def bootstrap_ci(values: np.ndarray, n_boot: int = 10_000, seed: int = 42) -> tuple[float, float]:
+    """Vectorized 95% bootstrap CI for a scalar mean (per IMPLEMENTATION_SPEC.md)."""
+    values = np.asarray(values, dtype=float)
+    n = len(values)
+    if n == 0:
         return (np.nan, np.nan)
-    rng = np.random.default_rng(42)
-    means = [float(np.mean(rng.choice(values, size=len(values), replace=True))) for _ in range(n_boot)]
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, n, size=(n_boot, n))
+    means = values[idx].mean(axis=1)
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
@@ -362,21 +325,10 @@ def figure4_accuracy_over_time(decomp_df: pd.DataFrame) -> None:
 
 def main() -> None:
     ensure_directories()
-    real_df = load_snapshot_data()
-    if real_df.empty:
+    df = load_snapshot_data()
+    if df.empty:
         raise SystemExit("No snapshot data available. Run 05_analyze.py first.")
-    real_df = split_crypto_from_economics(real_df)
-
-    print("=" * 60)
-    print(f"SYNTHETIC ECONOMICS GENERATION (seed={SYNTH_SEED})")
-    print(f"  Model: p_true ~ Beta(alpha,alpha); price = p_true + N(0,sigma)")
-    print(f"  Per-horizon alpha: {SYNTH_BETA_ALPHA}")
-    print(f"  Per-horizon sigma: {SYNTH_NOISE_SIGMA}")
-    print(f"  N per horizon: {N_SYNTHETIC_PER_HORIZON}")
-    print("=" * 60)
-
-    synth_df = generate_synthetic_economics(N_SYNTHETIC_PER_HORIZON, SYNTH_SEED)
-    df = pd.concat([real_df, synth_df], ignore_index=True)
+    df = split_crypto_from_economics(df)
     df = assign_bins(df)
 
     print("\nSnapshot rows per genre x horizon:")

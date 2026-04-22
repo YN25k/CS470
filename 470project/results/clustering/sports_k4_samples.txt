@@ -1,0 +1,32 @@
+Genre: sports
+k = 4
+Silhouette: 0.0765
+Cluster sizes: [54, 108, 204, 70]
+
+--- Cluster 0 (n=54) ---
+  - Spread: Norwich City FC (-1.5)
+  - Spread: Middlesbrough FC (-2.5)
+  - Spread: FK Jablonec (-1.5)
+  - Spread: Querétaro FC (-2.5)
+  - Spread: CR Brasil (-2.5)
+
+--- Cluster 1 (n=108) ---
+  - Islanders vs. Senators
+  - Blackhawks vs. Flyers
+  - Saudi Arabia vs. Egypt: O/U 2.5
+  - Hungary vs. Slovenia: Both Teams to Score
+  - Penguins vs. Islanders
+
+--- Cluster 2 (n=204) ---
+  - Ulsan HD FC vs. FC Seoul: O/U 3.5
+  - Moldova vs. Lithuania: O/U 2.5
+  - Mexico vs. Portugal: Both Teams to Score
+  - Singapore vs. Bangladesh: O/U 3.5
+  - Côte d'Ivoire vs. Scotland: O/U 4.5
+
+--- Cluster 3 (n=70) ---
+  - Will Türkiye vs. Romania end in a draw?
+  - Will CA Bucaramanga win on 2026-03-27?
+  - Will Hokkaidō Consadole Sapporo win on 2026-03-28?
+  - Will Brad Underwood win the Men's 2026 Naismith Coach of the Year award?
+  - Will a 9 seed win the 2026 Men's NCAA Tournament?

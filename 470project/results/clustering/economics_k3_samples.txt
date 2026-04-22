@@ -1,0 +1,25 @@
+Genre: economics
+k = 3
+Silhouette: 0.3491
+Cluster sizes: [269, 159, 72]
+
+--- Cluster 0 (n=269) ---
+  - Bitcoin Up or Down - March 21, 2:30AM-2:45AM ET
+  - Ethereum Up or Down - March 21, 1:20PM-1:25PM ET
+  - Bitcoin Up or Down - March 21, 4:20PM-4:25PM ET
+  - Bitcoin Up or Down - March 27, 6PM ET
+  - Bitcoin Up or Down - March 26, 11:15PM-11:20PM ET
+
+--- Cluster 1 (n=159) ---
+  - Solana Up or Down - March 18, 7:15PM-7:20PM ET
+  - Solana Up or Down - March 20, 2:45PM-2:50PM ET
+  - XRP Up or Down - March 20, 3:15PM-3:30PM ET
+  - Hyperliquid Up or Down - March 20, 7:30PM-7:35PM ET
+  - XRP Up or Down - March 27, 4AM ET
+
+--- Cluster 2 (n=72) ---
+  - Jerome Powell out as Fed Chair by March 31, 2026?
+  - Will Ethereum reach $3,200 in March?
+  - Will the price of XRP be above $1.10 on March 28?
+  - Will the price of Ethereum be above $1,900 on March 29?
+  - Will the price of Solana be above $70 on March 31?

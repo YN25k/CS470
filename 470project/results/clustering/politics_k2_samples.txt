@@ -1,0 +1,18 @@
+Genre: politics
+k = 2
+Silhouette: 0.2051
+Cluster sizes: [123, 138]
+
+--- Cluster 0 (n=123) ---
+  - Will Mexico’s February unemployment rate be 2.6%?
+  - Will Opendoor (OPEN) close above $1.00 end of March?
+  - Will Google (GOOGL) close above $320 end of March?
+  - Will Apple (AAPL) close above $310 end of March?
+  - Will Lions win?
+
+--- Cluster 1 (n=138) ---
+  - Will the highest temperature in Dallas be between 82-83°F on March 20?
+  - Will the highest temperature in Atlanta be between 86-87°F on March 26?
+  - Will the highest temperature in Miami be between 88-89°F on March 26?
+  - Will the highest temperature in Ankara be 16°C on March 26?
+  - Will the highest temperature in Madrid be 20°C on March 26?
